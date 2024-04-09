@@ -30,8 +30,7 @@ using namespace std;
 // XXX: Returns the iterator to the value if found else end.
 // XXX: Obviously we assume that the list is sorted.
 template <class T, typename U>
-enable_if<is_integral<U>::value, T>::type
-binary_find(T s, T e, const U v) {
+enable_if<is_integral<U>::value, T>::type binary_find(T s, T e, const U v) {
   T m;
   while (e - s > 2) {
     st half = (e - s) / 2;
@@ -51,19 +50,29 @@ binary_find(T s, T e, const U v) {
     }
   }
   // XXX: This final one should be O(2) always
-  while(s != e){
-    if(*s == v) break;
+  while (s != e) {
+    if (*s == v)
+      break;
     ++s;
   }
   return s;
 }
 
+template <typename T> ostream &operator<<(ostream &os, const vector<T> &vec) {
+  for (const T &v : vec)
+    cout << v << " ";
+  cout << "\n";
+  return os;
+}
+
 // XXX: Can print anything via iterators. Can also print value of arrays
 // via pointers.
 void print_iter(auto f, auto l) {
+  st counter = 0;
   while (f != l) {
-    cout << *f << " ";
+    cout << counter << ": " << *f << " ";
     ++f;
+    ++counter;
   }
   cout << "\n";
 }
@@ -76,13 +85,6 @@ template <typename T> ostream &operator<<(ostream &os, const pair<T, T> &vec) {
 template <typename T>
 ostream &operator<<(ostream &os, const tuple<T, T, T> &vec) {
   os << "<" << get<0>(vec) << "," << get<1>(vec) << "," << get<2>(vec) << ">\n";
-  return os;
-}
-
-template <typename T> ostream &operator<<(ostream &os, const vector<T> &vec) {
-  for (const T &v : vec)
-    cout << v << " ";
-  cout << "\n";
   return os;
 }
 
@@ -972,7 +974,7 @@ void new_flight_routes() {
 pair<bool, bool> search_grid(int u, int dest, vector<int> &path,
                              vector<bool> &vis, const vector<int> *adj,
                              vector<vector<int>> *memo, vector<int> *ndone,
-			     const int start, const int tnodes) {
+                             const int start, const int tnodes) {
   // cout << "start: " << start << " dest: " << dest << "\n";
   // cout << "path: " << path;
   // cout << "u: " << u << "\n";
@@ -980,8 +982,8 @@ pair<bool, bool> search_grid(int u, int dest, vector<int> &path,
   bool done = false;
   bool found = false;
   // XXX: Base case
-  if(u == dest){
-    if(memo[u].empty())
+  if (u == dest) {
+    if (memo[u].empty())
       memo[u].push_back({u});
     found = true;
     // XXX: This is a short cut while traversing!
@@ -998,9 +1000,8 @@ pair<bool, bool> search_grid(int u, int dest, vector<int> &path,
         vis[adj[u][i]] = true;
         // XXX: Also state that you have done this child
         ndone[u].push_back(adj[u][i]);
-        auto [dd, ff] =
-	  search_grid(adj[u][i], dest, path, vis, adj, memo, ndone, start,
-		      tnodes);
+        auto [dd, ff] = search_grid(adj[u][i], dest, path, vis, adj, memo,
+                                    ndone, start, tnodes);
         if (dd) {
           // cout << "done!\n";
           done = true;
@@ -1009,10 +1010,10 @@ pair<bool, bool> search_grid(int u, int dest, vector<int> &path,
           // cout << "ff is true\n";
           // XXX: I have found another path to the destination
           // XXX: Go through all child paths and add them to yourself
-	  // cout << path << "\n";
+          // cout << path << "\n";
           // cout << "Checking to put in: " << memo[adj[u][i]].size() << " in "
           //      << u << "\n";
-	  // XXX: Get only the longest vector from the child!
+          // XXX: Get only the longest vector from the child!
           vector<int> sizes(memo[adj[u][i]].size(), 0);
           transform(begin(memo[adj[u][i]]), end(memo[adj[u][i]]), begin(sizes),
                     [](const vector<int> &vvv) { return vvv.size(); });
@@ -1024,10 +1025,10 @@ pair<bool, bool> search_grid(int u, int dest, vector<int> &path,
             // XXX: The current node is prepended to the path
             if (v.size() == max_child_size) { // just using the longest one(s)
               if (find(begin(v), end(v), u) == end(v)) {
-		vector<int> vv(v.size() + 1, u);
-		copy(begin(v), end(v), begin(vv) + 1);
-		memo[u].push_back(vv);
-	      }
+                vector<int> vv(v.size() + 1, u);
+                copy(begin(v), end(v), begin(vv) + 1);
+                memo[u].push_back(vv);
+              }
             }
           }
           if (u == start) {
@@ -1164,6 +1165,269 @@ void grid_search() {
   }
 }
 
+int bfs_max_flow(int s, const int N, const vector<int> *adj, const int *cap,
+                 vector<int> &parent, const int t) {
+  int flow = 0;
+  // XXX: initialise the parent vector
+  fill(begin(parent), end(parent), -1);
+  // XXX: Set the source parent to -2, something negative.
+  parent[s] = -2;
+  // XXX: Make the queue to perform BFS
+  queue<pair<int, int>> q;
+  q.push({s, INFINITY});
+  while (!q.empty()) {
+    // XXX: Start processing the nodes
+    // XXX: Need to get the child with cap > 0 if it exists.
+    auto [p, pflow] = q.front();
+    q.pop();
+    for (const int &c : adj[p]) {
+      if (parent[c] == -1 and cap[p * N + c] > 0) {
+        pflow = min(pflow, cap[p * N + c]);
+        // cout << "pflow: " << pflow << "\n";
+        parent[c] = p; // set the parent of the visited node
+        if (c == t) {
+          // XXX: Found the target node!
+          flow = pflow;
+          // cout << "flow: " << flow << "\n";
+          goto END;
+        } else {
+          // XXX: Push it onto the q to process.
+          q.push({c, pflow});
+        }
+      }
+    }
+  }
+END:
+  return flow;
+}
+
+void get_reachable_edges_cap_gt0(const int s, const vector<int> *adj,
+                                 const int *cap, vector<int> &r, const int N,
+                                 vector<bool> &vis) {
+  vis[s] = true;
+  // XXX: Go through each child
+  for (const int &n : adj[s]) {
+    if (!vis[n]) {
+      // XXX: Now n has to be the child
+      if (cap[s * N + n] > 0) {
+        get_reachable_edges_cap_gt0(n, adj, cap, r, N, vis);
+      }
+    }
+  }
+  r.push_back(s);
+}
+
+void stcut(const vector<int> *adj, const int N, const int *cap,
+           vector<pair<int, int>> &edges, const vector<int> &sr) {
+
+  for (const int &n : sr) {
+    // XXX: Get edges that have negative capacity
+    for (const int &c : adj[n]) {
+      if ((find(begin(sr), end(sr), c) == end(sr)) and cap[n * N + c] <= 0) {
+        edges.push_back({n, c});
+      }
+    }
+  }
+}
+
+// XXX: This is max-flow algorithm. Think of it as how much max water
+// can flow from the source tap (s) to the destination tank (t). Such
+// that none of the pipes burst! The s-t cut, is like cutting the pipes,
+// which highlight the bottleneck!
+void police_chase() {
+  st N, M;
+  cin >> N; // nodes in graph
+  cin >> M; // edges in graph
+
+  int cap[N][N]; // the capacity matrix of each edge.
+  fill(&cap[0][0], &cap[0][0] + (N * N), -1);
+  vector<int> adj[N];
+  st counter = 0;
+  int s = 0;
+  int t = N - 1;
+  int r, d;
+  while (counter < M) {
+    cin >> r;
+    --r;
+    cin >> d;
+    --d;
+    adj[r].push_back(d);
+    adj[d].push_back(r);
+    // XXX: Fill in the capacity for one side
+    cap[r][d] = 1;
+    cap[d][r] = 0;
+    ++counter;
+  }
+
+  // print_iter(&adj[0], &adj[0] + N);
+  // for (st i = 0; i < N; ++i) {
+  //   for (st j = 0; j < N; ++j) {
+  //     cout << i << "," << j << ": " << cap[i][j] << " ";
+  //   }
+  //   cout << "\n";
+  // }
+
+  // XXX: Now start doing the max-flow
+  // int max_flow = 0;
+  vector<int> parent(N, -1);
+  while (1) {
+    int flow = bfs_max_flow(s, N, adj, &cap[0][0], parent,
+                            t); // obtained from bfs_max_flow
+    // cout << "parent: " << parent;
+    // cout << "flow: " << flow << "\n";
+    if (flow == 0)
+      break; // done with max_flow
+    // XXX: Update the capacities
+    // max_flow += flow;
+    // XXX: start from the target node and move backwards (like Dijkstra)
+    int c = t;
+    while (c != s) {
+      int p = parent[c];
+      cap[p][c] -= flow; // capacity is reduced by flow.
+      cap[c][p] += flow; // cap in opposite direction is now positive.
+      c = p;
+    }
+    // for (st i = 0; i < N; ++i) {
+    //   for (st j = 0; j < N; ++j) {
+    // 	cout << i << "," << j << ": " << cap[i][j] << " ";
+    //   }
+    //   cout << "\n";
+    // }
+  }
+  // cout << max_flow;
+
+  // XXX: Now we have the max_flow. Now we want to get the s-t cut. This
+  // is done by doing a dfs from source, such that capacity of the edges
+  // from source > 0.
+  vector<int> sr;
+  vector<bool> vis(N, false);
+  get_reachable_edges_cap_gt0(s, adj, &cap[0][0], sr, N, vis);
+  // XXX: Now we have the edges reachable from source
+  // XXX: Now cut the edges from sr
+  vector<pair<int, int>> edges;
+  stcut(adj, N, &cap[0][0], edges, sr);
+  cout << edges.size() << "\n";
+  for (auto &[f, s] : edges) {
+    cout << (f + 1) << " " << (s + 1) << "\n";
+  }
+}
+
+// XXX: This is the bipartite graph matching algorithm. Basic idea is to
+// match one node from left set to the one to the right set, such that
+// we have maximum number of matches.
+void school_dance(){
+  st B, G, P;
+  cin >> B; // number of boys
+  cin >> G; // number of girls
+  cin >> P; // potential pairs
+
+  // XXX: We have boys in 1 set (left). Girls in 1 set (right).
+  // Potential matchings. We have to match 1 boy/girl so that there are
+  // no conflicts and maximum matches are found.
+
+  // XXX: This will be solved using max_flow Ford_Fulkerson algorithm.
+
+  st counter = 0;
+  int s = B + G; // the source node.
+  int t = s + 1; // the target node.
+  int N = B + G + 2;  // total number of nodes in the graph.
+  vector<int> adj[N]; // graph adjacency list format.
+  int cap[N][N];      // the capacity of edges graph O(N * N)
+  fill(&cap[0][0], &cap[0][0] + (N * N), -1);
+  int b, g;
+
+  // TODO: I don't think I need to have an undirected graph!
+  while (counter < P) {
+    cin >> b;
+    --b;
+    cin >> g;
+    --g;
+    g += B;
+    // XXX: source node connected to each boy (left)
+    if(find(begin(adj[s]), end(adj[s]), b) == end(adj[s]))
+      adj[s].push_back(b);
+    if (find(begin(adj[b]), end(adj[b]), s) == end(adj[b]))
+      adj[b].push_back(s);
+    // XXX: Fill in the capacity matrix
+    cap[s][b] = 1;
+    cap[b][s] = 0;
+
+    // XXX: Girl (right set) connected to the target
+    if (find(begin(adj[g]), end(adj[g]), t) == end(adj[g]))
+      adj[g].push_back(t);
+    if (find(begin(adj[t]), end(adj[t]), g) == end(adj[t]))
+      adj[t].push_back(g);
+
+    // XXX: Fill in the capacity matrix
+    cap[g][t] = 1;
+    cap[t][g] = 0;
+
+    // XXX: Boy connected to the girl
+    adj[b].push_back(g);
+    adj[g].push_back(b);
+    // XXX: Fill in the capacity matrix
+    cap[b][g] = 1;
+    cap[g][b] = 0;
+
+    ++counter;
+  }
+
+  print_iter(&adj[0], &adj[0] + N);
+  for (st i = 0; i < N; ++i) {
+    for (st j = 0; j < N; ++j) {
+      cout << i << "," << j << ": " << cap[i][j] << " ";
+    }
+    cout << "\n";
+  }
+
+  // XXX: Now do bfs_max_flow
+  int max_flow = 0;
+  int flow = 0;
+  vector<int> parent(N, -1);
+  while (1) {
+    flow = bfs_max_flow(s, N, adj, &cap[0][0], parent, t);
+    if (!flow)
+      break;
+    max_flow += flow;
+    // XXX: Update the capacity matrix
+    int c = t;
+    cout << "parent: " << parent << "\n";
+    while (c != s) {
+      int p = parent[c];
+      cap[p][c] -= flow;
+      cap[c][p] += flow;
+      c = p;
+    }
+  }
+  cout << max_flow << "\n";
+  // print_iter(&adj[0], &adj[0] + N);
+  // for (st i = 0; i < N; ++i) {
+  //   for (st j = 0; j < N; ++j) {
+  //     cout << i << "," << j << ": " << cap[i][j] << " ";
+  //   }
+  //   cout << "\n";
+  // }
+  // XXX: Matches are those, that have a capacity of zero in the cap
+  // matrix.
+
+  for (st b = 0; b < B; ++b)
+    for (st g = B; g < (B + G); ++g)
+      if (!cap[b][g])
+        cout << (b + 1) << " " << ((g -B) + 1) << "\n";
+}
+
+void string_reverse(string &s) {
+  string toret = "";
+  st j = s.size() - 1;
+  for (st i = 0; i < s.size(); ++i, --j) {
+    if (i >= j)
+      break;
+    char temp = s[i];
+    s[i] = s[j];
+    s[j] = temp;
+  }
+}
+
 int main() {
   // list_to_set();
   // gray_code();
@@ -1182,5 +1446,7 @@ int main() {
   // new_flight_routes();
   // giant_pizza();
   // grid_search();
+  // police_chase();
+  // school_dance();
   return 0;
 }
