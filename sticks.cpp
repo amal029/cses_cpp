@@ -4,18 +4,23 @@
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
+#include <exception>
 #include <functional>
 #include <iostream>
 #include <iterator>
 #include <limits>
 #include <map>
+#include <math.h>
+#include <memory>
 #include <numeric>
+#include <optional>
 #include <ostream>
 #include <queue>
 #include <random>
 #include <ranges>
 #include <set>
 #include <stack>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -30,7 +35,7 @@ using namespace std;
 // XXX: Returns the iterator to the value if found else end.
 // XXX: Obviously we assume that the list is sorted.
 template <class T, typename U>
-enable_if<is_integral<U>::value, T>::type binary_find(T s, T e, const U v) {
+enable_if<is_integral_v<U>, T>::type binary_find(T s, T e, const U v) {
   T m;
   while (e - s > 2) {
     st half = (e - s) / 2;
@@ -58,6 +63,39 @@ enable_if<is_integral<U>::value, T>::type binary_find(T s, T e, const U v) {
   return s;
 }
 
+// XXX: Generic tuple printing (from C++17 only)
+template <typename... Ts>
+std::ostream &operator<<(std::ostream &os, std::tuple<Ts...> const &theTuple) {
+  std::apply(
+      [&os](Ts const &...tupleArgs) {
+	os << '[';
+	std::size_t n{0};
+	((os << tupleArgs << (++n != sizeof...(Ts) ? ", " : "")), ...);
+	os << ']';
+      },
+      theTuple);
+  return os;
+}
+
+// template <typename T, typename U>
+// ostream &operator<<(ostream &os, const tuple<T, U, U> &vec) {
+//   auto &[f, s, t] = vec;
+//   os << "<" << f << "," << s << "," << t << ">\n";
+//   return os;
+// }
+
+// template <typename T>
+// ostream &operator<<(ostream &os, const tuple<T, T, T> &vec) {
+//   os << "<" << get<0>(vec) << "," << get<1>(vec) << "," << get<2>(vec) << ">\n";
+//   return os;
+// }
+
+// template <typename T, typename U>
+// ostream &operator<<(ostream &os, const pair<T, U> &vec) {
+//   os << "<" << vec.first << "," << vec.second << ">\n";
+//   return os;
+// }
+
 template <typename T> ostream &operator<<(ostream &os, const vector<T> &vec) {
   for (const T &v : vec)
     cout << v << " ";
@@ -75,17 +113,6 @@ void print_iter(auto f, auto l) {
     ++counter;
   }
   cout << "\n";
-}
-
-template <typename T> ostream &operator<<(ostream &os, const pair<T, T> &vec) {
-  os << "<" << vec.first << "," << vec.second << ">\n";
-  return os;
-}
-
-template <typename T>
-ostream &operator<<(ostream &os, const tuple<T, T, T> &vec) {
-  os << "<" << get<0>(vec) << "," << get<1>(vec) << "," << get<2>(vec) << ">\n";
-  return os;
 }
 
 template <typename T>
@@ -360,28 +387,22 @@ void polygon_area() {
     cin >> y;
     vertices[counter++] = pair<int, int>{x, y};
   }
+  auto det = [](pair<int, int> f, pair<int, int> s) {
+    auto &[x1, y1] = f;
+    auto &[x2, y2] = s;
+    return (x1 * y2) - (x2 * y1);
+  };
 
-  // XXX: Now make triangles and apply heron' formula
-  pair<int, int> p1 = vertices[0];
-  auto length = [](const pair<int, int> &x, const pair<int, int> &y) {
-    return sqrt((y.first - x.first) * (y.first - x.first) +
-                (y.second - x.second) * (y.second - x.second));
-  };
-  auto heron = [](const auto &l1, const auto &l2, const auto &l3) {
-    auto s = 0.5 * (l1 + l2 + l3); // semi-perimeter
-    return sqrt(s * (s - l1) * (s - l2) * (s - l3));
-  };
+  // XXX: Now make triangles and apply shoelace formula
   auto area = 0;
-  for (auto it = begin(vertices) + 1; end(vertices) - it >= 2; ++it) {
-    // XXX: compute the lengths of the sides
-    auto l1 = length(p1, *it);
-    auto l2 = length(p1, *(it + 1));
-    auto l3 = length(*it, *(it + 1));
-    // XXX: Now apply heron' formula
-    area += heron(l1, l2, l3);
+  for (auto it = begin(vertices) + 1; it != end(vertices); ++it) {
+    // XXX: Apply shoelace formula for any polygon
+    area += det(*(it - 1), *it);
   }
+  area += det(*(end(vertices) - 1), *begin(vertices));
 
-  cout << 2 * area << "\n";
+  // XXX: We are not dividing it by 2 as asked for!
+  cout << area << "\n";
 }
 
 void min_euclid_dist() {
@@ -1315,7 +1336,7 @@ void police_chase() {
 // XXX: This is the bipartite graph matching algorithm. Basic idea is to
 // match one node from left set to the one to the right set, such that
 // we have maximum number of matches.
-void school_dance(){
+void school_dance() {
   st B, G, P;
   cin >> B; // number of boys
   cin >> G; // number of girls
@@ -1328,15 +1349,14 @@ void school_dance(){
   // XXX: This will be solved using max_flow Ford_Fulkerson algorithm.
 
   st counter = 0;
-  int s = B + G; // the source node.
-  int t = s + 1; // the target node.
+  int s = B + G;      // the source node.
+  int t = s + 1;      // the target node.
   int N = B + G + 2;  // total number of nodes in the graph.
   vector<int> adj[N]; // graph adjacency list format.
   int cap[N][N];      // the capacity of edges graph O(N * N)
   fill(&cap[0][0], &cap[0][0] + (N * N), -1);
   int b, g;
 
-  // TODO: I don't think I need to have an undirected graph!
   while (counter < P) {
     cin >> b;
     --b;
@@ -1344,7 +1364,7 @@ void school_dance(){
     --g;
     g += B;
     // XXX: source node connected to each boy (left)
-    if(find(begin(adj[s]), end(adj[s]), b) == end(adj[s]))
+    if (find(begin(adj[s]), end(adj[s]), b) == end(adj[s]))
       adj[s].push_back(b);
     if (find(begin(adj[b]), end(adj[b]), s) == end(adj[b]))
       adj[b].push_back(s);
@@ -1413,40 +1433,1016 @@ void school_dance(){
   for (st b = 0; b < B; ++b)
     for (st g = B; g < (B + G); ++g)
       if (!cap[b][g])
-        cout << (b + 1) << " " << ((g -B) + 1) << "\n";
+        cout << (b + 1) << " " << ((g - B) + 1) << "\n";
 }
 
-void string_reverse(string &s) {
-  string toret = "";
-  st j = s.size() - 1;
-  for (st i = 0; i < s.size(); ++i, --j) {
-    if (i >= j)
-      break;
-    char temp = s[i];
-    s[i] = s[j];
-    s[j] = temp;
+constexpr int cfib(int n) {
+  if (n == 0)
+    return 0;
+  else if (n == 1)
+    return 1;
+  else
+    return cfib(n - 1) + cfib(n - 2);
+}
+
+void teleporters_path() {
+  st N, M;
+  cin >> N; // nodes
+  cin >> M; // edges
+  st counter = 0;
+  int s, t;
+  st degree[N];
+  fill(&degree[0], &degree[0] + N, 0);
+  vector<pair<int, bool>> adj[N];
+  while (counter < M) {
+    cin >> s;
+    --s;
+    cin >> t;
+    --t;
+    // XXX: if s or d has a number increase the degree for that node
+    degree[s] += 1;
+    degree[t] += 1;
+    // XXX: Add the adjacency list graph
+    adj[s].push_back({t, false});
+    ++counter;
+  }
+  // print_iter(&degree[0], &degree[0] + N);
+  // print_iter(&adj[0], &adj[0] + N);
+
+  // XXX: Now for a eulerain path either all nodes should have an even
+  // degree or exactly 2 nodes with odd degree
+  st ec = 0, oc = 0;
+  for (const st &i : degree) {
+    if (i % 2 == 0)
+      ec += 1;
+    else
+      oc += 1;
+  }
+  if (ec != N) {
+    if (oc != 2) {
+      cout << "IMPOSSIBLE\n";
+      return;
+    }
+  }
+  // XXX: Now just find the Eulerian path
+  int start = 0;
+  stack<int> S;
+  vector<int> path;
+  S.push(start);
+  while (!S.empty()) {
+    // print_iter(&degree[0], &degree[0] + N);
+    // XXX: Traverse the adjacency list of the node, if the edge is not deleted.
+    int curr = S.top();
+    // cout << "curr: " << curr << "\n";
+    // cout << adj[curr];
+    if (!degree[curr]) {
+      // XXX: remove the node from the stack and put it on the path
+      path.push_back(curr + 1);
+      S.pop();
+    } else {
+      // XXX: Reduce the degree of curr
+      degree[curr] -= 1;
+      // XXX: Go through all the children and traverse them!
+      for (auto &[c, del] : adj[curr]) {
+        if (!del) {
+          del = true;
+          degree[c] -= 1;
+          S.push(c);
+          // XXX: Break, because we want to want to traverse one edge at a time!
+          break;
+        }
+      }
+    }
+  }
+  reverse(begin(path), end(path));
+  cout << path;
+}
+
+void convex_hull() {
+  st N;
+  cin >> N;
+  st counter = 0;
+  int x, y;
+  typedef pair<int, int> point;
+  vector<point> points;
+  cin >> x;
+  --x;
+  cin >> y;
+  --y;
+  points.push_back({x, y});
+  // XXX: Also get the min y point
+  point min_point{x, y};
+  // XXX: The first point is the min point
+  while (counter < N - 1) {
+    cin >> x;
+    --x;
+    cin >> y;
+    --y;
+    // XXX: If the curr value of y is less than min_point then update min_point
+    if (y < min_point.second) {
+      min_point = {x, y};
+    } else if (y == min_point.second) {
+      // XXX: Check the smaller x coordinate
+      if (x <= min_point.first) {
+        min_point = {x, y};
+      }
+    }
+    points.push_back({x, y});
+    ++counter;
+  }
+  // XXX: Sort the points according to their polar angle
+
+  // XXX: First get the polar angle of each point
+  auto dist = [](point x, point y) {
+    auto d1 = (x.second - y.second) * (x.second - y.second);
+    auto d2 = (x.first - y.first) * (x.first - y.first);
+    return sqrt(d1 + d2);
+  };
+  auto angle = [&min_point](point p) {
+    auto n = (p.second - min_point.second);
+    auto d = (p.first - min_point.first);
+    if (!d)
+      return numeric_limits<int>::max();
+    else
+      return (n / d);
+  };
+  auto sort_by_angle_and_dist = [&dist, &min_point, &angle](point x, point y) {
+    bool toret = false;
+    auto a1 = angle(x);
+    auto a2 = angle(y);
+    if (a1 > a2)
+      toret = true;
+    else if (a1 == a2) {
+      // auto d1 = dist(x);
+      // auto d2 = dist(y);
+      // toret = d1 <= d2;
+    }
+    return toret;
+  };
+  // XXX: Sorted the points in the hull!
+  sort(begin(points), end(points), sort_by_angle_and_dist);
+}
+
+void point_line_location() {
+  st T;
+  cin >> T;
+  st counter = 0;
+  double x1, y1, x2, y2, x3, y3;
+  while (counter < T) {
+    cin >> x1;
+    cin >> y1;
+    cin >> x2;
+    cin >> y2;
+    cin >> x3;
+    cin >> y3;
+
+    // XXX: First get the slope
+    double m = (y2 - y1) / (x2 - x1);
+    // cout << "m: " << m << "\n";
+    // XXX: Get the constant
+    double c = y1 - (m * x1);
+    // cout << "c: " << c << "\n";
+    // Now get the location for a given x
+    double _y = (m * x3) + c;
+    if (_y == y3) {
+      cout << "TOUCH\n";
+    } else {
+      // If slope is positive
+      if (m > 0) {
+        if (y3 < _y) {
+          cout << "RIGHT\n";
+        } else
+          cout << "LEFT\n";
+      } else if (m < 0) {
+        // XXX: Slope is negative
+        if (y3 < _y)
+          cout << "LEFT\n";
+        else
+          cout << "RIGHT\n";
+      }
+    }
+    ++counter;
+  }
+}
+
+void line_segment_intersection() {
+  st T;
+  cin >> T;
+  st counter = 0;
+  double x1, y1, x2, y2, x3, y3, x4, y4;
+  while (counter < T) {
+    cin >> x1;
+    cin >> y1;
+    cin >> x2;
+    cin >> y2;
+    cin >> x3;
+    cin >> y3;
+    cin >> x4;
+    cin >> y4;
+    // XXX: Now compute the intersection
+    double m1 = (y2 - y1) / (x2 - x1);
+    double m2 = (y3 - y4) / (x3 - x4);
+    // XXX: Get the constants
+    double c1 = y1 - (m1 * x1);
+    double c2 = y3 - (m2 * x3);
+
+    // XXX: The the common point if any that leads to intersection of 2
+    // lines!
+    if ((m1 - m2) == 0) {
+      if (c1 != c2)
+        cout << "NO\n";
+      else
+        cout << "YES\n";
+    } else {
+      double x = (c2 - c1) / (m1 - m2);
+      double y = (m1 * x) + c1;
+
+      // cout << "x, y: " << x << "," << y << "\n";
+
+      double minx = min(x1, x2);
+      double maxx = max(x1, x2);
+      double miny = min(y1, y2);
+      double maxy = max(y1, y2);
+
+      if (not(x >= minx and x <= maxx)) {
+        cout << "NO\n";
+        goto END;
+      }
+      if (not(y >= miny and y <= maxy)) {
+        cout << "NO\n";
+        goto END;
+      }
+      minx = min(x3, x4);
+      maxx = max(x3, x4);
+      miny = min(y3, y4);
+      maxy = max(y3, y4);
+      if (not(x >= minx and x <= maxx)) {
+        cout << "NO\n";
+        goto END;
+      }
+      if (not(y >= miny and y <= maxy)) {
+        cout << "NO\n";
+        goto END;
+      }
+      cout << "YES\n";
+    }
+  END:
+    ++counter;
+  }
+}
+
+void point_in_polygon() {
+  st N, M;
+  cin >> N;
+  cin >> M;
+
+  st counter = 0;
+  int x, y;
+  int vertx[N];
+  int verty[N];
+  vector<pair<int, int>> points;
+  // XXX: The vertices of the polygon.
+  while (counter < N) {
+    cin >> x;
+    cin >> y;
+    vertx[counter] = x;
+    verty[counter] = y;
+    ++counter;
+  }
+  counter = 0;
+  // XXX: All the points to check
+  while (counter < M) {
+    cin >> x;
+    cin >> y;
+    points.push_back({x, y});
+    ++counter;
+  }
+
+  // XXX: Ray tracing test -- odd number of intersections is inside
+  // point, else outside.
+  // https://wrfranklin.org/Research/Short_Notes/pnpoly.html
+  auto test = [&vertx, &verty, &N](float testx, float testy) -> bool {
+    int i, j, c = 0;
+    for (i = 0, j = N - 1; i < N; j = i++) {
+      if (((verty[i] > testy) != (verty[j] > testy)) &&
+          (testx <
+           (vertx[j] - vertx[i]) * (testy - verty[i]) / (verty[j] - verty[i]) +
+               vertx[i]))
+        c = !c;
+    }
+    return c;
+  };
+
+  for (auto &[testx, testy] : points) {
+    if (test(testx, testy))
+      cout << "INSIDE\n";
+    else
+      cout << "OUTSIDE\n";
+  }
+}
+
+void tree_dfs(const int node, int counter, const vector<int> *adj,
+              vector<bool> &vis, int *plen) {
+  vis[node] = true;
+  plen[node] = counter;
+
+  for (const int &child : adj[node]) {
+    if (!vis[child]) {
+      tree_dfs(child, counter + 1, adj, vis, plen);
+    }
+  }
+}
+
+void tree_lens(const vector<int> *adj, const int N, int *plens) {
+  vector<bool> vis(N, false);
+  int counter = 0;
+  for (st i = 0; i < N; ++i) {
+    int *plen = &plens[i * N];
+    // XXX: A array to hold the counter for reachability to each node
+    // from this node.
+    fill(&plen[0], &plen[0] + N, 0);
+    fill(begin(vis), end(vis), false);
+    counter = 0;
+    tree_dfs(i, counter, adj, vis, plen);
+  }
+}
+
+void tree_diameter() {
+  st N;
+  cin >> N;
+  vector<int> adj[N];
+  st counter = 0;
+  int s, d;
+  while (counter < N - 1) {
+    cin >> s;
+    --s;
+    cin >> d;
+    --d;
+    adj[s].push_back(d);
+    adj[d].push_back(s);
+    ++counter;
+  }
+
+  // print_iter(&adj[0], &adj[0] + N);
+
+  // XXX: Now get the diameter of the treea using DFS
+  int plens[N * N]; // O(N^2) space usage!
+  vector<bool> vis(N, false);
+  int diameter = 0;
+  tree_lens(adj, N, plens);
+  // 2*O(|V|^2)
+  for (st i = 0; i < N; ++i) {
+    int me = *max_element(&plens[i * N], &plens[i * N] + N);
+    diameter = max(diameter, me);
+  }
+  cout << diameter << "\n";
+}
+
+void tree_dist_2() {
+  st N;
+  cin >> N;
+  st counter = 0;
+  vector<int> adj[N];
+  int s, d;
+  while (counter < N - 1) {
+    cin >> s;
+    --s;
+    cin >> d;
+    --d;
+    adj[s].push_back(d);
+    adj[d].push_back(s);
+    ++counter;
+  }
+  counter = 0;
+  int plens[N * N];
+  tree_lens(adj, N, plens);
+  for (st i = 0; i < N; ++i) {
+    cout << accumulate(&plens[i * N], &plens[i * N] + N, 0) << " ";
+  }
+  cout << "\n";
+}
+
+void get_parents(const vector<int> *adj, vector<int> &p, const int c) {
+  // XXX: Just one or none parent possible in a tree
+  if (adj[c].size() != 0) {
+    p.push_back(adj[c][0]);
+    get_parents(adj, p, adj[c][0]);
+  } else if (p.empty())
+    // XXX: Adding yourself, since it was asked for!
+    p.push_back(c);
+}
+
+void company_query_2() {
+  st N, q;
+  cin >> N;       // number of employees
+  cin >> q;       // queries
+  st counter = 1; // start from the first employee
+  // XXX: This is a DAG going from child to parent only!
+  vector<int> adj[N]; // only N-1 employees have a boss
+  int b;
+  while (counter < N) {
+    cin >> b;
+    --b;
+    // XXX: Employee counter' boss is b
+    adj[counter].push_back(b);
+    ++counter;
+  }
+  counter = 0;
+  // print_iter(&adj[0], &adj[0] + N);
+  // XXX: Now read the queries
+  vector<pair<int, int>> qs;
+  int e1, e2;
+  while (counter < q) {
+    cin >> e1;
+    --e1;
+    cin >> e2;
+    --e2;
+    qs.push_back({e1, e2});
+    ++counter;
+  }
+  // cout << qs;
+  // XXX: Now get the least common parent from a given query!
+  vector<int> p1, p2;
+  for (auto &[q1, q2] : qs) {
+    if (!p1.empty())
+      p1.clear();
+    if (!p2.empty())
+      p2.clear();
+    // XXX: Get all reachable parents from q1 and q2 in order using DFS
+    // XXX: Note that this works, because we have made a DAG from the tree
+    get_parents(adj, p1, q1);
+    get_parents(adj, p2, q2);
+    // XXX: Now we have the parents in order from both nodes just
+    // traverse and get the first common parent in both vectors
+    for (auto &x : p1) {
+      auto it = find(begin(p2), end(p2), x);
+      if (it != end(p2)) {
+        cout << (*it) + 1 << "\n";
+        break;
+      }
+    }
+  }
+}
+
+int get_sum(const vector<int> *adj, vector<bool> &vis, int node,
+            const int *vals) {
+  vis[node] = true;
+  int sum = vals[node];
+  for (const int &x : adj[node]) {
+    if (!vis[x]) {
+      sum += get_sum(adj, vis, x, vals);
+    }
+  }
+  return sum;
+}
+
+int get_tree_sum(const vector<int> *adj, const int *vals, vector<bool> &vis,
+                 const int s, int r, bool &done) {
+  int sum = 0;
+  vis[r] = true;
+  if (s == r) {
+    // XXX: Found the node that I was searching for
+    done = true;
+    sum = get_sum(adj, vis, s, vals);
+  } else
+    for (const int &x : adj[r]) {
+      if (!vis[x]) {
+        sum = get_tree_sum(adj, vals, vis, s, x, done);
+        if (done)
+          break;
+      }
+    }
+  return sum;
+}
+
+void sub_tree_query() {
+  st N, Q;
+  cin >> N;
+  cin >> Q;
+  st counter = 0;
+  int node_vals[N]; // values in each node
+  while (counter < N)
+    cin >> node_vals[counter++];
+  counter = 0;
+  vector<int> adj[N];
+  int s, d;
+  while (counter < N - 1) {
+    cin >> s;
+    --s;
+    cin >> d;
+    --d;
+    adj[s].push_back(d);
+    adj[s].push_back(s);
+    ++counter;
+  }
+  counter = 0;
+  vector<pair<int, optional<int>>> qs;
+  int q;
+  while (counter < Q) {
+    cin >> q;
+    if (q == 1) {
+      cin >> s;
+      --s;
+      cin >> d;
+      qs.push_back({s, d});
+    } else if (q == 2) {
+      cin >> s;
+      --s;
+      qs.push_back({s, nullopt});
+    }
+    ++counter;
+  }
+
+  // XXX: Now start processing the queries
+  vector<bool> vis(N, false);
+  bool done = false;
+  for (auto &[n, ov] : qs) {
+    done = false;
+    fill(begin(vis), end(vis), false);
+    if (!ov) {
+      // XXX: Get the sum from the subtree
+      cout << get_tree_sum(adj, node_vals, vis, n, 0, done) << "\n";
+    } else {
+      // XXX: Change the value in the subtree
+      node_vals[n] = *ov;
+    }
+  }
+}
+
+int get_max_in_path(const vector<int> *adj, const int *vals, int s, const int d,
+                    vector<bool> &vis, bool &done) {
+  int m = vals[s];
+  vis[s] = true;
+  if (s == d) {
+    done = true;
+  } else
+    for (const int &x : adj[s]) {
+      if (!vis[x]) {
+        int m1 = get_max_in_path(adj, vals, x, d, vis, done);
+        if (done) {
+          m = max(m, m1);
+          break;
+        }
+      }
+    }
+  return m;
+}
+
+void path_query_2() {
+  st N, Q;
+  cin >> N;
+  cin >> Q;
+  vector<int> adj[N];
+  int vals[N];
+  st counter = 0;
+  while (counter < N)
+    cin >> vals[counter++];
+  counter = 0;
+  // XXX: Note that in a tree, edges == |V|-1
+  int s, d;
+  while (counter < N - 1) {
+    cin >> s;
+    --s;
+    cin >> d;
+    --d;
+    adj[s].push_back(d);
+    adj[d].push_back(s);
+    ++counter;
+  }
+  counter = 0;
+  vector<tuple<int, int, int>> qs;
+  int q;
+  while (counter < Q) {
+    cin >> q;
+    cin >> s;
+    --s;
+    cin >> d;
+    if (q == 2)
+      --d;
+    qs.push_back({q, s, d});
+    ++counter;
+  }
+  counter = 0;
+  // XXX: Process the queries
+  vector<bool> vis(N, false);
+  bool done = false;
+  for (auto &[q, s, d] : qs) {
+    fill(begin(vis), end(vis), false);
+    done = false;
+    if (q == 1) {
+      vals[s] = d;
+    } else if (q == 2) {
+      // XXX: Traverse the tree from the given node to the destination node and
+      // get the max value in the path
+      cout << get_max_in_path(adj, vals, s, d, vis, done) << " ";
+    }
+  }
+  cout << endl;
+}
+
+int get_tree_size(const vector<int> *adj, vector<bool> &vis, int r) {
+  vis[r] = true;
+  int sum = 1;
+  for (const int &x : adj[r]) {
+    if (!vis[x]) {
+      sum += get_tree_size(adj, vis, x);
+    }
+  }
+  return sum;
+}
+
+int tree_centroid(const vector<int> *adj, const int N, vector<bool> &vis,
+                  int r) {
+  st i = 0;
+  vis[r] = true;
+  int sum = numeric_limits<int>::max();
+  for (const int &x : adj[r]) {
+    if (!vis[x]) {
+      // XXX: Get the sum for this subtree
+      sum = get_tree_size(adj, vis, x);
+      // cout << "r: " << r << "\n";
+      // cout << "sum is: " << sum << "\n";
+      if (sum > N / 2) {
+        break;
+      }
+      ++i;
+    }
+  }
+  // cout << "i: " << i << "\n";
+  if (sum <= N / 2) {
+    return r;
+  } else {
+    fill(begin(vis), end(vis), false);
+    return tree_centroid(adj, N, vis, adj[r][i]);
+  }
+}
+
+void centroid() {
+  st N;
+  cin >> N;
+  st counter = 0;
+  vector<int> adj[N];
+  int s, d;
+  while (counter < N - 1) {
+    cin >> s;
+    --s;
+    cin >> d;
+    --d;
+    adj[s].push_back(d);
+    adj[d].push_back(s);
+    ++counter;
+  }
+  // print_iter(&adj[0], &adj[0] + N);
+  // XXX: Now find the centroid
+  vector<bool> vis(N, false);
+  cout << tree_centroid(adj, N, vis, 0) + 1 << "\n";
+}
+
+// XXX: Can be made faster with O(log N), space (4N) with segment tree
+void static_range_sum() {
+  st N, Q;
+  cin >> N;
+  cin >> Q;
+  int vals[N];
+  st counter = 0;
+  while (counter < N) {
+    cin >> vals[counter++];
+  }
+  counter = 0;
+  int s, e;
+  while (counter < Q) {
+    cin >> s;
+    --s;
+    cin >> e;
+    --e;
+    cout << accumulate(&vals[0] + s, &vals[0] + e + 1, 0) << "\n";
+    ++counter;
+  }
+}
+
+// XXX: Can be made faster O(log N), but spaec (4N) using segment tree
+void static_range_min() {
+  st N, Q;
+  cin >> N;
+  cin >> Q;
+  int vals[N];
+  st counter = 0;
+  while (counter < N) {
+    cin >> vals[counter++];
+  }
+  counter = 0;
+  int s, e;
+  while (counter < Q) {
+    cin >> s;
+    --s;
+    cin >> e;
+    --e;
+    cout << *min_element(&vals[0] + s, &vals[0] + e + 1) << "\n";
+    ++counter;
+  }
+}
+
+// XXX: Can be made faster with segment tree O(log N), space (4N)
+void xor_sum() {
+  st N, Q;
+  cin >> N;
+  cin >> Q;
+  int vals[N];
+  st counter = 0;
+  while (counter < N) {
+    cin >> vals[counter++];
+  }
+  counter = 0;
+  int s, e;
+  while (counter < Q) {
+    cin >> s;
+    --s;
+    cin >> e;
+    --e;
+    cout << accumulate(&vals[0] + s, &vals[0] + e + 1, 0, [](int x, int y) {
+      return x ^ y;
+    }) << "\n";
+    ++counter;
+  }
+}
+
+// XXX: Can be made faster with O(log N), space (4N)
+void range_update_query() {
+  st N, Q;
+  cin >> N;
+  cin >> Q;
+  int vals[N];
+  st counter = 0;
+  while (counter < N) {
+    cin >> vals[counter++];
+  }
+  counter = 0;
+  int s, e, q, u;
+  while (counter < Q) {
+    cin >> q;
+    if (q == 1) {
+      cin >> s;
+      --s;
+      cin >> e;
+      --s;
+      cin >> u;
+      // XXX: Transform the array
+      transform(&vals[0] + s, &vals[0] + e + 1, &vals[0] + s,
+                [&u](int x) { return x + u; });
+    } else if (q == 2) {
+      cin >> s;
+      --s;
+      cout << vals[s] << "\n";
+    }
+    ++counter;
+  }
+}
+
+// XXX: Segment tree index to update. See query_seg_tree_by_indices
+// function how to get the segment tree index for a given array index.
+// Complexity O(log N)
+template <typename T>
+void update_seg_tree_by_index(const st index, const T &val,
+                              tuple<T, st, st> *res,
+                              const auto &op = plus<T>{}) {
+  // XXX: Update the leaf node.
+  auto &[v, l, r] = res[index];
+  res[index] = {val, l, r};
+  // XXX: Now update the parent.
+  st counter = index;
+  while (counter != 0) {
+    // XXX: Get the parent and update its value
+    if (counter % 2 == 0) {
+      // XXX: Even index
+      counter = (counter - 2) / 2;
+    } else {
+      counter = (counter - 1) / 2;
+    }
+    auto &[_, l, r] = res[counter];
+    auto &[v1, l1, r1] = res[counter * 2 + 1];
+    auto &[v2, l2, r2] = res[counter * 2 + 2];
+    res[counter] = {op(v1, v2), l, r};
+  }
+}
+
+// XXX: Gives back the seg tree value found between lindex and rindex of
+// the original array indices. All indices start from 0. Complexity:
+// O(log N).
+template <typename T, class F = plus<T>>
+T query_seg_tree_by_indices(const st lindex, const st rindex,
+                            const tuple<T, st, st> *res, const F &op = F{},
+                            int counter = 0) {
+  assert(lindex <= rindex);
+  auto &[v, l, r] = res[counter];
+  assert(lindex >= l and rindex <= r);
+  if ((lindex == l) and (rindex == r)) {
+    return v;
+  } else if (rindex <= get<2>(res[2 * counter + 1])) {
+    return query_seg_tree_by_indices(lindex, rindex, res, (2 * counter + 1));
+  } else if (lindex >= get<1>(res[2 * counter + 2])) {
+    return query_seg_tree_by_indices(lindex, rindex, res, (2 * counter + 2));
+  } else {
+    // XXX: The most complex case search both branches
+    T r1 = query_seg_tree_by_indices(lindex, get<2>(res[counter * 2 + 1]), res,
+                                     counter * 2 + 1);
+    T r2 = query_seg_tree_by_indices(get<2>(res[counter * 2 + 1]) + 1, rindex,
+                                     res, counter * 2 + 2);
+    return op(r1, r2);
+  }
+}
+
+// XXX: Gives back the seg tree index for the given orignal array index.
+// Complexity: O(log N)
+template <typename T>
+st query_seg_tree_by_indices(const st index, const tuple<T, st, st> *res,
+                             int counter = 0) {
+  auto &[v, l, r] = res[counter];
+  assert(index >= l and index <= r);
+  if ((index == l) and (index == r)) {
+    return v;
+  } else if (index <= get<2>(res[2 * counter + 1])) {
+    return query_seg_tree_by_indices(index, res, (2 * counter + 1));
+  } else if (index >= get<1>(res[2 * counter + 2])) {
+    return query_seg_tree_by_indices(index, res, (2 * counter + 2));
+  } else {
+    // XXX: Can never reach here!
+    assert(false);
+  }
+}
+
+// XXX: It will return: (1) value in the node, (2) index in the
+// original array, and (3) index in the segment tree. Indices will be
+// -1 if the value is not found in the seg tree and val will be
+// returned. Complexity: O(log N).
+template <typename T, class F = less_equal<T>>
+tuple<T, int, int> query_seg_tree_by_value(const T &val, tuple<T, st, st> *res,
+                                           st counter = 0, const F &qop = F{}) {
+  const auto &[v, l, r] = res[counter];
+  if (qop(val, v) and (l == r)) {
+    return {v, l, counter};
+  } else if (qop(val, v) and (l < r)) {
+    // XXX: First check the left child
+    auto &&[vv, r, ti] = query_seg_tree_by_value(val, res, (2 * counter + 1));
+    if (r != -1)
+      return {vv, r, ti};
+    else
+      // XXX: Then check the right child
+      return query_seg_tree_by_value(val, res, (2 * counter + 2));
+  } else
+    return {val, -1, -1};
+}
+
+template <typename T, class F = plus<T>>
+void build_seg_tree_with_index(const T *const B, int counter, T *b, T *e,
+                               tuple<T, st, st> *res, const F &op = F{}) {
+  // XXX: Note that F is a struct plus<T>, op is object of that struct type with
+  // operator(). Note that auto does not work with default operator types!
+  if ((e - b) == 1) {
+    // XXX: Reached the end of the segment tree
+    res[counter] = {*b, (b - B), (e - B - 1)};
+  } else {
+    st mid = ((e - b) / 2);
+    // XXX: Make the left segment tree
+    build_seg_tree_with_index(B, (2 * counter + 1), b, b + mid, res);
+    // XXX: Make the right segment tree
+    build_seg_tree_with_index(B, (2 * counter + 2), b + mid, e, res);
+    auto &[res1, i1, i2] = res[(2 * counter + 1)];
+    auto &[res2, i11, i22] = res[(2 * counter + 2)];
+    res[counter] = {op(res1, res2), (b - B), (e - B - 1)};
+  }
+}
+
+void hotel_query() {
+  st N, M;
+  cin >> N; // number of hotels (array size)
+  cin >> M; // array size of groups.
+  st counter = 0;
+  int hotels[N];
+  while (counter < N) {
+    cin >> hotels[counter++];
+  }
+  counter = 0;
+  int groups[M];
+  while (counter < M) {
+    cin >> groups[counter++];
+  }
+  // print_iter(&hotels[0], &hotels[0] + N);
+  // print_iter(&groups[0], &groups[0] + M);
+
+  // XXX: Allocate space for the segment tree.
+  st h = static_cast<st>(ceil(log2(N)));
+  st size = 0;
+  for (st i = 0; i <= h; ++i)
+    size += (st)pow(2, i);
+  tuple<int, st, st> seg_tree[size];
+  // XXX: Note that mmax is actually a struct with operator(T a, T b) -> T
+  auto mmax = [](int x, int y) { return max(x, y); };
+  build_seg_tree_with_index(&hotels[0], 0, &hotels[0], &hotels[0] + N,
+                            &seg_tree[0], mmax);
+  // print_iter(&seg_tree[0], &seg_tree[0] + size);
+
+  // XXX: Now make a query to in the seg tree to get the index with the given
+  // value
+  for (const int &gv : groups) {
+    auto &&[v, ai, ti] = query_seg_tree_by_value(gv, &seg_tree[0], 0);
+    // cout << "v: " << v << ", ai: " << ai << ", ti: " << ti << "\n";
+    // XXX: Update the value in the seg tree
+    if (ti != -1) {
+      int uv = v - gv;
+      update_seg_tree_by_index(ti, uv, seg_tree, mmax);
+    }
+    cout << ai + 1 << " "; // incrementing, because everything starts with 1
+  }
+  cout << "\n";
+}
+
+// XXX: This is easiest implemented as O(N), there is O(log N) technique
+// with segment tree, but unclear right now how to handle, overlapping
+// prices.
+void pizza_query() {
+  st N, Q;
+  cin >> N;
+  cin >> Q;
+  st counter = 0;
+  int prices[N];
+  while (counter < N) {
+    cin >> prices[counter++];
+  }
+  counter = 0;
+  int q, i, me, j, res, p;
+  while (counter < Q) {
+    cin >> q;
+    if (q == 1) {
+      // XXX: Just update the value
+      cin >> i;
+      --i;
+      cin >> prices[i];
+    } else if (q == 2) {
+      // XXX: Just do a O(N) algorithm
+      cin >> me;
+      --me;
+      j = 0;
+      res = numeric_limits<int>::max();
+      for (int &x : prices) {
+        p = x + abs(j - me);
+        res = min(res, p);
+        ++j;
+      }
+      cout << res << "\n";
+    }
+    ++counter;
   }
 }
 
 int main() {
+  // XXX: Sorting and searching algo
   // list_to_set();
   // gray_code();
-  // sum_of_two();
+  // sum_of_two();// O(N) time, with hash-table
   // fwheel();
   // ad_sup();
   // slide_median();
-  // polygon_area();
-  // min_euclid_dist();
-  // shortest_route_1();
-  // course_schedule();
-  // road_reparation();
-  // road_construction();
-  // flight_route_reqs();
-  // forbidden_cities();
-  // new_flight_routes();
-  // giant_pizza();
-  // grid_search();
-  // police_chase();
-  // school_dance();
+
+  // XXX: Graph algorithms
+  // shortest_route_1(); //Dijkstra
+  // course_schedule(); // topological sort
+  // road_reparation(); //Minimum spanning tree
+  // road_construction();// minimum spaning tree, disjoint union of sets
+  // flight_route_reqs();// reachability
+  // forbidden_cities(); //reachability
+  // new_flight_routes();// strongly connected components, Kosaraju algo
+  // giant_pizza(); //2-SAT problem, implication graph, Kosaraju
+  // grid_search();//Hamiltonian path, dynamic programming
+  // police_chase();//Max network flow, min st cut, Karp algo
+  // school_dance();//Max flow, matching bipartite graph, Karp algo
+  // teleporters_path();//Eulerian path.
+
+  // XXX: Geometry
+  // point_line_location(); // (left, right or touch)
+  // line_segment_intersection();  //intersection of lines and then seg check
+  // min_euclid_dist(); //a sorted distance find
+  // polygon_area();//Shoelace (general), heron (convex)
+  // point_in_polygon();//ray intersection with sides of polygon
+  // TODO: Later
+  // convex_hull();//graham scan
+
+  // XXX: Tree algorithms (dfs: O(|V|)), because |E| = |V|-1 in a tree
+  // tree_diameter();
+  // tree_dist_2();
+  // company_query_2(); //Note that this can be done by inverting the tree
+  // sub_tree_query();
+  // path_query_2();
+  // centroid(); // Imp
+
+  // XXX: Range query algorithms (segment trees)
+  // static_range_sum();
+  // static_range_min();
+  // xor_sum();
+  // range_update_query();
+  hotel_query();
+  // pizza_query();
+
+  // XXX: String algorithms
+
   return 0;
 }
