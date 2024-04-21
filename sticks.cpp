@@ -1,27 +1,25 @@
 #include <algorithm>
 #include <assert.h>
-#include <bitset>
 #include <cassert>
+#include <climits>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
-#include <exception>
 #include <functional>
 #include <iostream>
 #include <iterator>
 #include <limits>
 #include <map>
 #include <math.h>
-#include <memory>
 #include <numeric>
 #include <optional>
 #include <ostream>
 #include <queue>
-#include <random>
 #include <ranges>
 #include <set>
 #include <stack>
-#include <stdexcept>
 #include <string>
+#include <sys/types.h>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -68,33 +66,20 @@ template <typename... Ts>
 std::ostream &operator<<(std::ostream &os, std::tuple<Ts...> const &theTuple) {
   std::apply(
       [&os](Ts const &...tupleArgs) {
-	os << '[';
-	std::size_t n{0};
-	((os << tupleArgs << (++n != sizeof...(Ts) ? ", " : "")), ...);
-	os << ']';
+        os << '[';
+        std::size_t n{0};
+        ((os << tupleArgs << (++n != sizeof...(Ts) ? ", " : "")), ...);
+        os << ']';
       },
       theTuple);
   return os;
 }
 
-// template <typename T, typename U>
-// ostream &operator<<(ostream &os, const tuple<T, U, U> &vec) {
-//   auto &[f, s, t] = vec;
-//   os << "<" << f << "," << s << "," << t << ">\n";
-//   return os;
-// }
-
-// template <typename T>
-// ostream &operator<<(ostream &os, const tuple<T, T, T> &vec) {
-//   os << "<" << get<0>(vec) << "," << get<1>(vec) << "," << get<2>(vec) << ">\n";
-//   return os;
-// }
-
-// template <typename T, typename U>
-// ostream &operator<<(ostream &os, const pair<T, U> &vec) {
-//   os << "<" << vec.first << "," << vec.second << ">\n";
-//   return os;
-// }
+template <typename T, typename U>
+ostream &operator<<(ostream &os, const pair<T, U> &vec) {
+  os << "<" << vec.first << "," << vec.second << ">\n";
+  return os;
+}
 
 template <typename T> ostream &operator<<(ostream &os, const vector<T> &vec) {
   for (const T &v : vec)
@@ -1518,6 +1503,77 @@ void teleporters_path() {
   cout << path;
 }
 
+// XXX: Bipartite graph division (only even cycles)
+void building_teams() {
+  st N, M;
+  cin >> N;
+  cin >> M;
+  st counter = 0;
+  vector<int> adj[N];
+  int s, t;
+  while (counter < M) {
+    cin >> s;
+    --s;
+    cin >> t;
+    --t;
+    ++counter;
+    // XXX: Undirected graph
+    adj[s].push_back(t);
+    adj[t].push_back(s);
+  }
+  // print_iter(adj, adj + N);
+  // XXX: Make a recursive lambda (DFS)
+  vector<bool> vis(N, false);
+  vector<uint16_t> color(N, 3);
+  // function<int(st counter)> dfs;
+  auto dfs = [&adj, &vis, &color](auto &&self, int counter) -> int {
+    vis[counter] = true;
+    int8_t c = -1;
+    bool toret = 0;
+    // XXX: Check if all visited neighbors are true?
+    for (int &x : adj[counter]) {
+      if (vis[x]) {
+        if (c == -1)
+          c = color[x];
+        else if (c != color[x]) {
+          toret = 1;
+          goto END;
+        }
+      }
+    }
+    // XXX: Assign yourself a color different to c
+    if (c == -1)
+      // XXX: Random choice
+      color[counter] = 1;
+    else if (c == 1)
+      color[counter] = 2;
+    else if (c == 2)
+      color[counter] = 1;
+
+    // XXX: Now go to the neighbor that is not visited
+    for (int &x : adj[counter]) {
+      if (!vis[x])
+        toret = self(self, x);
+      if (toret)
+        break;
+    }
+  END:
+    return toret;
+  };
+  // XXX: DO dfs for all nodes
+  int ret = 0;
+  for (st i = 0; i < N; ++i) {
+    if (!vis[i])
+      ret = dfs(dfs, i);
+    if (ret)
+      break;
+  }
+  if (ret)
+    cout << "IMPOSSIBLE\n";
+  else
+    cout << color;
+}
+
 void convex_hull() {
   st N;
   cin >> N;
@@ -2198,6 +2254,11 @@ void range_update_query() {
   }
 }
 
+// XXX: Used for generic base operator for projecting the value.
+template <typename T> struct BOP {
+  T operator()(T v, st l, st r) const { return v; }
+};
+
 // XXX: Segment tree index to update. See query_seg_tree_by_indices
 // function how to get the segment tree index for a given array index.
 // Complexity O(log N)
@@ -2259,7 +2320,7 @@ st query_seg_tree_by_indices(const st index, const tuple<T, st, st> *res,
   auto &[v, l, r] = res[counter];
   assert(index >= l and index <= r);
   if ((index == l) and (index == r)) {
-    return v;
+    return counter;
   } else if (index <= get<2>(res[2 * counter + 1])) {
     return query_seg_tree_by_indices(index, res, (2 * counter + 1));
   } else if (index >= get<1>(res[2 * counter + 2])) {
@@ -2292,20 +2353,21 @@ tuple<T, int, int> query_seg_tree_by_value(const T &val, tuple<T, st, st> *res,
     return {val, -1, -1};
 }
 
-template <typename T, class F = plus<T>>
-void build_seg_tree_with_index(const T *const B, int counter, T *b, T *e,
-                               tuple<T, st, st> *res, const F &op = F{}) {
+template <typename T, typename U, class F = plus<T>, class Y = BOP<U>>
+void build_seg_tree_with_index(const U *const B, int counter, U *b, U *e,
+                               tuple<T, st, st> *res, const F &op = F{},
+                               const Y &bop = Y{}) {
   // XXX: Note that F is a struct plus<T>, op is object of that struct type with
   // operator(). Note that auto does not work with default operator types!
   if ((e - b) == 1) {
     // XXX: Reached the end of the segment tree
-    res[counter] = {*b, (b - B), (e - B - 1)};
+    res[counter] = {bop(*b, (b - B), (e - B - 1)), (b - B), (e - B - 1)};
   } else {
     st mid = ((e - b) / 2);
     // XXX: Make the left segment tree
-    build_seg_tree_with_index(B, (2 * counter + 1), b, b + mid, res);
+    build_seg_tree_with_index(B, (2 * counter + 1), b, b + mid, res, op, bop);
     // XXX: Make the right segment tree
-    build_seg_tree_with_index(B, (2 * counter + 2), b + mid, e, res);
+    build_seg_tree_with_index(B, (2 * counter + 2), b + mid, e, res, op, bop);
     auto &[res1, i1, i2] = res[(2 * counter + 1)];
     auto &[res2, i11, i22] = res[(2 * counter + 2)];
     res[counter] = {op(res1, res2), (b - B), (e - B - 1)};
@@ -2394,6 +2456,309 @@ void pizza_query() {
   }
 }
 
+void subarray_max_sum() {
+  st N, M;
+  st counter = 0;
+  cin >> N;
+  cin >> M;
+  int array[N];
+  pair<int, int> qs[M];
+  while (counter < N) {
+    cin >> array[counter++];
+  }
+  counter = 0;
+  int index, val;
+  while (counter < M) {
+    cin >> index;
+    --index;
+    cin >> val;
+    qs[counter++] = {index, val};
+    // XXX: Get the seg tree index
+  }
+  using s_t = tuple<int, int, int, int>;
+  // XXX: Build the segment tree with the given structure and operation.
+  auto bop = [](int v, st x, st y) { return s_t{v, v, v, v}; };
+  // XXX: Merge between 2 nodes
+  auto op = [](s_t x, s_t y) {
+    auto &[xts, xps, xss, xms] = x;
+    auto &[yts, yps, yss, yms] = y;
+    int ts = xts + yts;
+    int ps = max(xps, (xts + yps));
+    int ss = max(yss, (yts + xss));
+    int ms = max({xms, yms, (xss + yps)});
+    return s_t{ts, ps, ss, ms};
+  };
+  // XXX: Build the segment tree
+  // XXX: Allocate space for the segment tree.
+  st h = static_cast<st>(ceil(log2(N)));
+  st size = 0;
+  for (st i = 0; i <= h; ++i)
+    size += (st)pow(2, i);
+  tuple<s_t, st, st> seg_tree[size];
+  build_seg_tree_with_index(array, 0, array, array + N, seg_tree, op, bop);
+  // print_iter(seg_tree, seg_tree + size);
+  for (const auto &[i, v] : qs) {
+    // cout << "i: " << i << ", v: " << v << "\n";
+    st si = query_seg_tree_by_indices(i, seg_tree, 0);
+    update_seg_tree_by_index(si, {v, v, v, v}, seg_tree, op);
+    const auto &[ts, _1, _2] = seg_tree[0];
+    cout << get<3>(ts) << "\n";
+  }
+}
+
+// XXX: I am doing this in O(n) time. However, you can do O(log n) time
+// if you just increment the value of the correct node, in the segment
+// tree, with index [l, r] given by the value n(n+1)/2, where n = (r -
+// l) +1. In the worst case then the updating the tree would be O(log n)
+// time and the result would be available in the top. Note, that O(n)
+// using iota and accumulate lets one use SIMD.
+void polynomial_queries() {
+  st N, Q;
+  cin >> N;
+  cin >> Q;
+  int arr[N];
+  st counter = 0;
+  while (counter < N)
+    cin >> arr[counter++];
+  // print_iter(arr, arr + N);
+  int q, s, e;
+  counter = 0;
+  while (counter < Q) {
+    cin >> q;
+    cin >> s;
+    --s;
+    cin >> e;
+    --e;
+    if (q == 2) {
+      // XXX: The +1 is needed in accumulate, because of [) semantics of
+      // accumulate.
+      cout << accumulate(arr + s, arr + e + 1, 0) << "\n";
+    } else if (q == 1) {
+      // XXX: Update the value of each element in the range [s, e+1) by
+      // 1,2,...n
+      for (st i = s; i <= (e - s); ++i) {
+        arr[i] += (i + 1);
+      }
+    }
+    ++counter;
+  }
+}
+
+// XXX: I cannot compile this with Clang++ > -O0, because it gives the wrong
+// output!
+void task_assignment() {
+  st N;
+  cin >> N;
+  // XXX: Make NxN matrix for allocation
+  int A[N * N];
+  int orig[N * N];
+  st counter = 0;
+  int i = 0;
+  while (counter < N) {
+    i = 0;
+    while (i < N) {
+      cin >> A[N * counter + i];
+      orig[N * counter + i] = A[N * counter + i];
+      i++;
+    }
+    counter += 1;
+  }
+  // print_iter(A, A + (N * N));
+
+  // XXX: This is a balanced minimisation problem, so no preprocessing
+  // needed see:
+  // https://www.cs.emory.edu/~cheung/Courses/253/Syllabus//Assignment/algorithm.html
+  // https://kanchiuniv.ac.in/coursematerials/OperationResearch.pdf
+
+  // XXX: Steps:
+
+  // 1. First identify the lowest edges from x -> y, make then 0.
+  // subtract lowest from the row 2. Next identify the lowest edges from
+  // y -> x, make them 0. Subtract lowest from column. 3. Make a new
+  // subgraph with lowest edges. Do maximal matching (max-flow karp) for
+  // this subgraph. If maximal matching contains all xs then stop
+  // solution found. If not, then Step 4. Add more edges the min edge of
+  // unmatched to y' with no edge to them yet. Subtract the lowest value
+  // from all rows of matched -> no edge y's. Add the min to all matched
+  // x -> y's . Step 4 addition/subtraction only for cost > 0. Do
+  // Step 3 and 4 iteratively until maximum matching is found. O(N^4)
+  // complexity algorithm.
+
+  const int s = (2 * N); // index of source
+  const int t = s + 1;   // index of target
+  const int row_size = t + 1;
+  const int col_size = t + 1;
+
+  // for (st i = 0; i < N; ++i) {
+  //   cout << i << ": ";
+  //   print_iter(&A[i * N], &A[i * N] + N);
+  // }
+  // cout << "\n";
+  // XXX: Step-1
+  // O(N^2)
+  int mine = INT_MAX;
+  for (st i = 0; i < N; ++i) {
+    // XXX: get min element in the row
+    mine = INT_MAX;
+    mine = *min_element(&A[i * N], &A[i * N + N]);
+    transform(&A[i * N], &A[i * N + N], &A[i * N],
+              [&mine](int x) { return (x - mine); });
+  }
+  // for (st i = 0; i < N; ++i) {
+  //   cout << i << ": ";
+  //   print_iter(&A[i * N], &A[i * N] + N);
+  // }
+  // cout << "\n";
+
+  // XXX: Step-2 do the same for the column
+  // O(N^2)
+  mine = INT_MAX;
+  for (st j = 0; j < N; ++j) {
+    mine = INT_MAX;
+    for (st i = 0; i < N; ++i)
+      mine = min(mine, A[i * N + j]);
+    for (st i = 0; i < N; ++i)
+      A[i * N + j] -= mine;
+  }
+  // for (st i = 0; i < N; ++i) {
+  //   cout << i << ": ";
+  //   print_iter(&A[i * N], &A[i * N] + N);
+  // }
+  // cout << "\n";
+
+  // XXX: Now make the adjacency list format for the zero elements
+  vector<int> parents(row_size, -1); // O(N)
+  int capacity[row_size * col_size]; // O(N^2)
+  vector<int> adj[row_size];         // 2 extra for source and target
+  auto make_cap_adj = [&]() {
+    fill(capacity, capacity + row_size * col_size, -1);
+    for (st i = 0; i < N; ++i) {
+      for (st j = 0; j < N; ++j) {
+        if (!A[i * N + j]) {
+          adj[i].push_back(j + N);
+          adj[j + N].push_back(i);
+          // XXX: Add the source to the left nodes
+          if (find(adj[s].begin(), adj[s].end(), i) == adj[s].end())
+            adj[s].push_back(i);
+          if (find(adj[i].begin(), adj[i].end(), s) == adj[i].end())
+            adj[i].push_back(s);
+          // XXX: Add the right nodes to the target
+          if (find(adj[t].begin(), adj[t].end(), (j + N)) == adj[t].end())
+            adj[t].push_back(j + N);
+          if (find(adj[j + N].begin(), adj[j + N].end(), t) == end(adj[j + N]))
+            adj[j + N].push_back(t);
+
+          // XXX: Make capacity matrix values
+          capacity[i * row_size + (j + N)] = 1;
+          capacity[(j + N) * row_size + i] = 0;
+          capacity[s * row_size + i] = 1;
+          capacity[i * row_size + s] = 0;
+          capacity[(j + N) * row_size + t] = 1;
+          capacity[t * row_size + (j + N)] = 0;
+        }
+      }
+    }
+  };
+  make_cap_adj();
+  // for (st i = 0; i < N; ++i) {
+  //   cout << i << ": ";
+  //   print_iter(&A[i * N], &A[i * N] + N);
+  // }
+  // print_iter(adj, adj + row_size);
+  // for (int i = 0; i < row_size; ++i) {
+  //   cout << i << ": ";
+  //   print_iter(&capacity[i * row_size], &capacity[i * row_size] + col_size);
+  // }
+  // XXX: Now perform the max-flow
+  int flow = -1;
+  int total = 0;
+  vector<tuple<int, int>> matches;
+  auto matching = [&]() {
+    flow = -1;
+    total = 0;
+    matches.clear();
+    while (1) {
+      flow = bfs_max_flow(s, row_size, adj, capacity, parents, t);
+      if (!flow)
+        break;
+      int c = t;
+      int p;
+      while (c != s) {
+        // XXX: Update the capacity matrix
+        p = parents[c];
+        capacity[p * row_size + c] -= flow;
+        capacity[c * row_size + p] += flow;
+        c = p;
+      }
+    }
+    // XXX: Get the matchings and check if it is a maximum matching
+    for (st i = 0; i < N; ++i) {
+      for (st j = 0; j < N; ++j) {
+        if (!capacity[i * row_size + (j + N)]) {
+          // XXX: Found a match
+          matches.push_back({i, j});
+          total += orig[i * N + j];
+        }
+      }
+    }
+  };
+  matching(); // Works for the given example.
+  vector<int> unmatched;
+  while (matches.size() != N) {
+    unmatched.clear();
+    // O(N^2)
+    for (st i = 0; i < N; ++i) {
+      if (find_if(matches.begin(), matches.end(),
+                  [&i](const tuple<int, int> &p) { return get<0>(p) == i; }) ==
+          matches.end()) {
+        unmatched.push_back(i);
+      }
+    }
+    vector<int> unmatched_adj[unmatched.size()];
+    // XXX: First get the min element from all unmatched --> no connection edges
+    int delta = INT_MAX; // This is delta
+    for (int i : unmatched) {
+      for (st j = 0; j < N; ++j) {
+        if (A[i * N + j] > 0) {
+          // XXX: there is no edge between this job and i
+          delta = min(delta, A[i * N + j]);
+        } else if (A[i * N + j] == 0)
+          unmatched_adj[i].push_back(j);
+      }
+    }
+    // XXX: Now subtract the delta from all these edges
+    for (int i : unmatched) {
+      for (st j = 0; j < N; ++j) {
+        if (A[i * N + j] > 0) {
+          A[i * N + j] -= delta;
+        }
+      }
+    }
+    // XXX: Add to other edges (CHECK!)
+    for (auto &[i, _] : matches) {
+      for (int u : unmatched) {
+        for (int k : unmatched_adj[u]) {
+          if (A[i * N + k] > 0)
+            A[i * N + k] += delta;
+        }
+      }
+    }
+    // XXX: Iterate
+    make_cap_adj();
+    matching();
+  }
+  // XXX: If the matches size == N, the solution found
+  cout << total << "\n";
+  transform(matches.begin(), matches.end(), matches.begin(),
+            [](const tuple<int, int> &p) -> tuple<int, int> {
+              auto &[x, y] = p;
+              return {x + 1, y + 1};
+            });
+  for (auto &[x, y] : matches) {
+    cout << x << " " << y << "\n";
+  }
+}
+
 int main() {
   // XXX: Sorting and searching algo
   // list_to_set();
@@ -2416,6 +2781,7 @@ int main() {
   // police_chase();//Max network flow, min st cut, Karp algo
   // school_dance();//Max flow, matching bipartite graph, Karp algo
   // teleporters_path();//Eulerian path.
+  // building_teams(); // Bipartite graph colouring
 
   // XXX: Geometry
   // point_line_location(); // (left, right or touch)
@@ -2439,8 +2805,17 @@ int main() {
   // static_range_min();
   // xor_sum();
   // range_update_query();
-  hotel_query();
+  // hotel_query(); //easy segment tree
   // pizza_query();
+  // Very important; what is max prefix, max suffix, and max sub-array sum
+  // subarray_max_sum();
+  // polynomial_queries();
+
+  // XXX: Task assignment problem for NxN task allocation problem in
+  // polynomial time! (Hungarian algorithm) -- max-flow extension
+  task_assignment();
+
+  // XXX: Test for a recursive lambda in 2 different ways
 
   // XXX: String algorithms
 
