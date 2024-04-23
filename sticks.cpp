@@ -2572,20 +2572,6 @@ void task_assignment() {
   // https://www.cs.emory.edu/~cheung/Courses/253/Syllabus//Assignment/algorithm.html
   // https://kanchiuniv.ac.in/coursematerials/OperationResearch.pdf
 
-  // XXX: Steps:
-
-  // 1. First identify the lowest edges from x -> y, make then 0.
-  // subtract lowest from the row 2. Next identify the lowest edges from
-  // y -> x, make them 0. Subtract lowest from column. 3. Make a new
-  // subgraph with lowest edges. Do maximal matching (max-flow karp) for
-  // this subgraph. If maximal matching contains all xs then stop
-  // solution found. If not, then Step 4. Add more edges the min edge of
-  // unmatched to y' with no edge to them yet. Subtract the lowest value
-  // from all rows of matched -> no edge y's. Add the min to all matched
-  // x -> y's . Step 4 addition/subtraction only for cost > 0. Do
-  // Step 3 and 4 iteratively until maximum matching is found. O(N^4)
-  // complexity algorithm.
-
   const int s = (2 * N); // index of source
   const int t = s + 1;   // index of target
   const int row_size = t + 1;
