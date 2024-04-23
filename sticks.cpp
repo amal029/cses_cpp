@@ -14,9 +14,11 @@
 #include <numeric>
 #include <optional>
 #include <ostream>
+#include <print>
 #include <queue>
 #include <ranges>
 #include <set>
+#include <sstream>
 #include <stack>
 #include <string>
 #include <sys/types.h>
@@ -2766,219 +2768,169 @@ void task_assignment() {
   }
 }
 
+// XXX: Find matchings without max-flow
+bool greedy_matching(const int *A, const int col_index, const int row_size,
+                     int row, int *matches, unordered_set<int> &conflict,
+                     const int val_to_cmp = 0) {
+  // XXX: First get all the zeros in the pointed to row.
+  vector<st> zeros;
+  zeros.reserve(row_size);
+  // XXX: First we try matching some zero -- more efficient.
+  // O(row_size^2) -- but good cache efficiency (temporal locality)
+  for (st x = col_index; x < row_size;) {
+    auto it =
+        find(&A[row * row_size + x], &A[row * row_size + row_size], val_to_cmp);
+    // print_iter(&A[row * row_size + x], &A[row * row_size + row_size]);
+    // cout << "\n";
+    if (it != &A[row * row_size + row_size]) {
+      // XXX: The index has been pushed in!
+      st u = it - &A[row * row_size + x] + x;
+      zeros.push_back(u);
+      x += u + 1;
+    } else
+      break;
+  }
+  // cout << "zeros: " << zeros;
+  // throw "tutue";
 
-// void task_assignment() {
-//   st N;
-//   cin >> N;
-//   // XXX: Make NxN matrix for allocation
-//   int A[N * N];
-//   int orig[N * N];
-//   st counter = 0;
-//   int i = 0;
-//   while (counter < N) {
-//     i = 0;
-//     while (i < N) {
-//       cin >> A[N * counter + i];
-//       orig[N * counter + i] = A[N * counter + i];
-//       i++;
-//     }
-//     counter += 1;
-//   }
-//   // print_iter(A, A + (N * N));
+  bool done = false;
+  // XXX: Can be fused with the upper loop!
+  for (const int j : zeros) {
+    // XXX: -1 indicates nothing is filled in.
+    if (matches[j] == -1) {
+      // XXX: If I already exist in matches then move myself!
+      // O(row_size)
+      auto it = find(matches, matches + row_size, row);
+      if (it != matches + row_size) {
+        matches[it - matches] = -1; // check with just *it = -1
+        // cout << "found myself in there\n";
+      }
+      matches[j] = row;
+      done = true;
+      break;
+    }
+  }
+  if (!done) {
+    // XXX: Only now try to get a match by shifting other matches if possible.
+    for (const int j : zeros) {
+      st mrow = matches[j];
+      if (greedy_matching(A, j + 1, row_size, mrow, matches, conflict)) {
+        // XXX: Nothing to remove here!
+        matches[j] = row;
+        done = true;
+        break;
+      } else {
+        // XXX: Added myself and the conflicting node to the conflict set
+        conflict.insert(mrow);
+        conflict.insert(row);
+      }
+    }
+  }
+  // print_iter(matches, matches + row_size);
+  return done;
+}
 
-//   // XXX: This is a balanced minimisation problem, so no preprocessing
-//   // needed see:
-//   // https://www.cs.emory.edu/~cheung/Courses/253/Syllabus//Assignment/algorithm.html
-//   // https://kanchiuniv.ac.in/coursematerials/OperationResearch.pdf
+void hungarian_matrix_task_assignment() {
+  st N;
+  cin >> N;
+  // XXX: Make NxN matrix for allocation
+  int A[N * N];
+  int orig[N * N];
+  st counter = 0;
+  int i = 0;
+  while (counter < N) {
+    i = 0;
+    while (i < N) {
+      cin >> A[N * counter + i];
+      orig[N * counter + i] = A[N * counter + i];
+      i++;
+    }
+    counter += 1;
+  }
+  const int row_size = N;
+  int mine = INT_MAX;
+  // XXX: Step-1 O(N^2)
+  for (st i = 0; i < N; ++i) {
+    // XXX: get min element in the row
+    mine = INT_MAX;
+    mine = *min_element(&A[i * N], &A[i * N + N]);
+    transform(&A[i * N], &A[i * N + N], &A[i * N],
+              [&mine](int x) { return (x - mine); });
+  }
+  // XXX: Step-2 do the same for the column
+  // O(N^2)
+  mine = INT_MAX;
+  for (st j = 0; j < N; ++j) {
+    mine = INT_MAX;
+    for (st i = 0; i < N; ++i)
+      mine = min(mine, A[i * N + j]);
+    for (st i = 0; i < N; ++i)
+      A[i * N + j] -= mine;
+  }
+  // for (st i = 0; i < N; ++i) {
+  //   cout << i << ": ";
+  //   print_iter(&A[i * N], &A[i * N] + N);
+  // }
+  // cout << "\n";
 
-//   // XXX: Steps:
-
-//   // 1. First identify the lowest edges from x -> y, make then 0.
-//   // subtract lowest from the row 2. Next identify the lowest edges from
-//   // y -> x, make them 0. Subtract lowest from column. 3. Make a new
-//   // subgraph with lowest edges. Do maximal matching (max-flow karp) for
-//   // this subgraph. If maximal matching contains all xs then stop
-//   // solution found. If not, then Step 4. Add more edges the min edge of
-//   // unmatched to y' with no edge to them yet. Subtract the lowest value
-//   // from all rows of matched -> no edge y's. Add the min to all matched
-//   // x -> y's . Step 4 addition/subtraction only for cost > 0. Do
-//   // Step 3 and 4 iteratively until maximum matching is found. O(N^4)
-//   // complexity algorithm.
-
-//   const int s = (2 * N); // index of source
-//   const int t = s + 1;   // index of target
-//   const int row_size = t + 1;
-//   const int col_size = t + 1;
-
-//   // for (st i = 0; i < N; ++i) {
-//   //   cout << i << ": ";
-//   //   print_iter(&A[i * N], &A[i * N] + N);
-//   // }
-//   // cout << "\n";
-//   // XXX: Step-1
-//   // O(N^2)
-//   int mine = INT_MAX;
-//   for (st i = 0; i < N; ++i) {
-//     // XXX: get min element in the row
-//     mine = INT_MAX;
-//     mine = *min_element(&A[i * N], &A[i * N + N]);
-//     transform(&A[i * N], &A[i * N + N], &A[i * N],
-//               [&mine](int x) { return (x - mine); });
-//   }
-//   // for (st i = 0; i < N; ++i) {
-//   //   cout << i << ": ";
-//   //   print_iter(&A[i * N], &A[i * N] + N);
-//   // }
-//   // cout << "\n";
-
-//   // XXX: Step-2 do the same for the column
-//   // O(N^2)
-//   mine = INT_MAX;
-//   for (st j = 0; j < N; ++j) {
-//     mine = INT_MAX;
-//     for (st i = 0; i < N; ++i)
-//       mine = min(mine, A[i * N + j]);
-//     for (st i = 0; i < N; ++i)
-//       A[i * N + j] -= mine;
-//   }
-//   // for (st i = 0; i < N; ++i) {
-//   //   cout << i << ": ";
-//   //   print_iter(&A[i * N], &A[i * N] + N);
-//   // }
-//   // cout << "\n";
-
-//   // XXX: Now make the adjacency list format for the zero elements
-//   vector<int> parents(row_size, -1); // O(N)
-//   int capacity[row_size * col_size]; // O(N^2)
-//   vector<int> adj[row_size];         // 2 extra for source and target
-//   auto make_cap_adj = [&]() {
-//     fill(capacity, capacity + row_size * col_size, -1);
-//     for (st i = 0; i < N; ++i) {
-//       for (st j = 0; j < N; ++j) {
-//         if (!A[i * N + j]) {
-//           adj[i].push_back(j + N);
-//           adj[j + N].push_back(i);
-//           // XXX: Add the source to the left nodes
-//           if (find(adj[s].begin(), adj[s].end(), i) == adj[s].end())
-//             adj[s].push_back(i);
-//           if (find(adj[i].begin(), adj[i].end(), s) == adj[i].end())
-//             adj[i].push_back(s);
-//           // XXX: Add the right nodes to the target
-//           if (find(adj[t].begin(), adj[t].end(), (j + N)) == adj[t].end())
-//             adj[t].push_back(j + N);
-//           if (find(adj[j + N].begin(), adj[j + N].end(), t) == end(adj[j + N]))
-//             adj[j + N].push_back(t);
-
-//           // XXX: Make capacity matrix values
-//           capacity[i * row_size + (j + N)] = 1;
-//           capacity[(j + N) * row_size + i] = 0;
-//           capacity[s * row_size + i] = 1;
-//           capacity[i * row_size + s] = 0;
-//           capacity[(j + N) * row_size + t] = 1;
-//           capacity[t * row_size + (j + N)] = 0;
-//         }
-//       }
-//     }
-//   };
-//   make_cap_adj();
-//   // for (st i = 0; i < N; ++i) {
-//   //   cout << i << ": ";
-//   //   print_iter(&A[i * N], &A[i * N] + N);
-//   // }
-//   // print_iter(adj, adj + row_size);
-//   // for (int i = 0; i < row_size; ++i) {
-//   //   cout << i << ": ";
-//   //   print_iter(&capacity[i * row_size], &capacity[i * row_size] + col_size);
-//   // }
-//   // XXX: Now perform the max-flow
-//   int flow = -1;
-//   int total = 0;
-//   vector<tuple<int, int>> matches;
-//   auto matching = [&]() {
-//     flow = -1;
-//     total = 0;
-//     matches.clear();
-//     while (1) {
-//       flow = bfs_max_flow(s, row_size, adj, capacity, parents, t);
-//       if (!flow)
-//         break;
-//       int c = t;
-//       int p;
-//       while (c != s) {
-//         // XXX: Update the capacity matrix
-//         p = parents[c];
-//         capacity[p * row_size + c] -= flow;
-//         capacity[c * row_size + p] += flow;
-//         c = p;
-//       }
-//     }
-//     // XXX: Get the matchings and check if it is a maximum matching
-//     for (st i = 0; i < N; ++i) {
-//       for (st j = 0; j < N; ++j) {
-//         if (!capacity[i * row_size + (j + N)]) {
-//           // XXX: Found a match
-//           matches.push_back({i, j});
-//           total += orig[i * N + j];
-//         }
-//       }
-//     }
-//   };
-//   matching(); // Works for the given example.
-//   vector<int> unmatched;
-//   while (matches.size() != N) {
-//     unmatched.clear();
-//     // O(N^2)
-//     for (st i = 0; i < N; ++i) {
-//       if (find_if(matches.begin(), matches.end(),
-//                   [&i](const tuple<int, int> &p) { return get<0>(p) == i; }) ==
-//           matches.end()) {
-//         unmatched.push_back(i);
-//       }
-//     }
-//     vector<int> unmatched_adj[unmatched.size()];
-//     // XXX: First get the min element from all unmatched --> no connection edges
-//     int delta = INT_MAX; // This is delta
-//     for (int i : unmatched) {
-//       for (st j = 0; j < N; ++j) {
-//         if (A[i * N + j] > 0) {
-//           // XXX: there is no edge between this job and i
-//           delta = min(delta, A[i * N + j]);
-//         } else if (A[i * N + j] == 0)
-//           unmatched_adj[i].push_back(j);
-//       }
-//     }
-//     // XXX: Now subtract the delta from all these edges
-//     for (int i : unmatched) {
-//       for (st j = 0; j < N; ++j) {
-//         if (A[i * N + j] > 0) {
-//           A[i * N + j] -= delta;
-//         }
-//       }
-//     }
-//     // XXX: Add to other edges (CHECK!)
-//     for (auto &[i, _] : matches) {
-//       for (int u : unmatched) {
-//         for (int k : unmatched_adj[u]) {
-//           if (A[i * N + k] > 0)
-//             A[i * N + k] += delta;
-//         }
-//       }
-//     }
-//     // XXX: Iterate
-//     make_cap_adj();
-//     matching();
-//   }
-//   // XXX: If the matches size == N, the solution found
-//   cout << total << "\n";
-//   transform(matches.begin(), matches.end(), matches.begin(),
-//             [](const tuple<int, int> &p) -> tuple<int, int> {
-//               auto &[x, y] = p;
-//               return {x + 1, y + 1};
-//             });
-//   for (auto &[x, y] : matches) {
-//     cout << x << " " << y << "\n";
-//   }
-// }
+  int matches[row_size];
+  fill(matches, matches + row_size, -1);
+  unordered_set<int> conflict;
+  // bool matched;
+  for (const int i : ranges::views::iota(0, row_size)) {
+    greedy_matching(A, 0, row_size, i, matches, conflict);
+    // cout << i << " " << (matched ? "matched\n" : "not matched\n");
+  }
+  unordered_set<int> unmatched_adj(N); // Make better (consuming O(N) space)
+  while (!conflict.empty()) {
+    // XXX: First get the min element from all unmatched --> no connection edges
+    int delta = INT_MAX; // This is delta
+    for (int i : conflict) {
+      for (st j = 0; j < N; ++j) {
+        if (A[i * N + j] > 0) {
+          // XXX: there is no edge between this job and i
+          delta = min(delta, A[i * N + j]);
+        } else if (A[i * N + j] == 0) {
+          // cout << "adding to unmatched job #: " << j << "\n";
+          unmatched_adj.insert(j);
+        }
+      }
+    }
+    // cout << "delta: " << delta << "\n";
+    // print_iter(unmatched_adj, unmatched_adj + N);
+    // XXX: Now subtract the delta from all these edges
+    for (int i : conflict) {
+      for (st j = 0; j < N; ++j) {
+        if (A[i * N + j] > 0) {
+          A[i * N + j] -= delta;
+        }
+      }
+    }
+    // XXX: Add to other edges -- this can be done in a better way for sure!
+    for (int i : ranges::views::iota(0, row_size)) {
+      if (find(conflict.begin(), conflict.end(), i) == conflict.end())
+        for (int k : unmatched_adj) {
+          // XXX: Make this better than O(N)
+          if (A[i * N + k] > 0)
+            A[i * N + k] += delta;
+        }
+    }
+    conflict.clear();
+    unmatched_adj.clear();
+    fill(matches, matches + row_size, -1);
+    for (const int i : ranges::views::iota(0, row_size)) {
+      greedy_matching(A, 0, row_size, i, matches, conflict);
+      // cout << i << " " << (matched ? "matched\n" : "not matched\n");
+    }
+  }
+  int total = 0;
+  stringstream too;
+  for (const int x : ranges::views::iota(0, row_size)) {
+    total += orig[matches[x] * row_size + x];
+    too << matches[x] + 1 << " " << (x + 1) << "\n";
+  }
+  cout << total << "\n" << too.str();
+}
 
 int main() {
   // XXX: Sorting and searching algo
@@ -3034,9 +2986,12 @@ int main() {
 
   // XXX: Task assignment problem for NxN task allocation problem in
   // polynomial time! (Hungarian algorithm) -- max-flow extension
-  task_assignment();
+  // task_assignment();
+  // XXX: The below one only works on the matrix to solve task assignment
+  // hungarian_matrix_task_assignment();
 
-  // XXX: Test for a recursive lambda in 2 different ways
+  // XXX: Test for a recursive lambda in 2 different ways -- yes it works with
+  // clang C++23, but does not work with g++!
 
   // XXX: String algorithms
 
