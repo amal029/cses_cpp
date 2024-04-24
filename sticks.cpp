@@ -2853,61 +2853,42 @@ void hungarian_matrix_task_assignment() {
     for (st i = 0; i < N; ++i)
       A[i * N + j] -= mine;
   }
-  // for (st i = 0; i < N; ++i) {
-  //   cout << i << ": ";
-  //   print_iter(&A[i * N], &A[i * N] + N);
-  // }
-  // cout << "\n";
 
   int matches[row_size];
   fill(matches, matches + row_size, -1);
   unordered_set<int> conflict;
-  // bool matched;
   for (const int i : ranges::views::iota(0, row_size)) {
     greedy_matching(A, 0, row_size, i, matches, conflict);
-    // cout << i << " " << (matched ? "matched\n" : "not matched\n");
   }
   unordered_set<int> unmatched_adj(N); // Make better (consuming O(N) space)
   while (!conflict.empty()) {
-    // XXX: First get the min element from all unmatched --> no connection edges
     int delta = INT_MAX; // This is delta
     for (int i : conflict) {
       for (st j = 0; j < N; ++j) {
         if (A[i * N + j] > 0) {
-          // XXX: there is no edge between this job and i
           delta = min(delta, A[i * N + j]);
         } else if (A[i * N + j] == 0) {
-          // cout << "adding to unmatched job #: " << j << "\n";
           unmatched_adj.insert(j);
         }
       }
     }
-    // cout << "delta: " << delta << "\n";
-    // print_iter(unmatched_adj, unmatched_adj + N);
     // XXX: Now subtract the delta from all these edges
-    for (int i : conflict) {
-      for (st j = 0; j < N; ++j) {
-        if (A[i * N + j] > 0) {
+    for (int i : conflict)
+      for (st j = 0; j < N; ++j)
+        if (A[i * N + j] > 0)
           A[i * N + j] -= delta;
-        }
-      }
-    }
+
     // XXX: Add to other edges -- this can be done in a better way for sure!
-    for (int i : ranges::views::iota(0, row_size)) {
+    for (int i : ranges::views::iota(0, row_size))
       if (find(conflict.begin(), conflict.end(), i) == conflict.end())
-        for (int k : unmatched_adj) {
-          // XXX: Make this better than O(N)
+        for (int k : unmatched_adj)
           if (A[i * N + k] > 0)
             A[i * N + k] += delta;
-        }
-    }
     conflict.clear();
     unmatched_adj.clear();
     fill(matches, matches + row_size, -1);
-    for (const int i : ranges::views::iota(0, row_size)) {
+    for (const int i : ranges::views::iota(0, row_size))
       greedy_matching(A, 0, row_size, i, matches, conflict);
-      // cout << i << " " << (matched ? "matched\n" : "not matched\n");
-    }
   }
   int total = 0;
   stringstream too;
@@ -2916,6 +2897,10 @@ void hungarian_matrix_task_assignment() {
     too << matches[x] + 1 << " " << (x + 1) << "\n";
   }
   cout << total << "\n" << too.str();
+}
+
+void word_combinations() {
+  // XXX: Recursive filter based solution
 }
 
 int main() {
@@ -2980,6 +2965,7 @@ int main() {
   // clang C++23, but does not work with g++!
 
   // XXX: String algorithms
+  word_combinations();
 
   return 0;
 }
