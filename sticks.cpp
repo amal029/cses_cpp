@@ -2901,6 +2901,365 @@ void hungarian_matrix_task_assignment() {
 
 void word_combinations() {
   // XXX: Recursive filter based solution
+  string ss;
+  cin >> ss;
+  st k = 0;
+  st counter = 0;
+  cin >> k;
+  vector<string> words(k);
+  while (counter < k)
+    cin >> words[counter++];
+
+  // XXX: O(k^2*|ss|)
+  // Now filter the words and make the recursive function
+  int res = 0;
+  auto rec_res = [&](this auto &&self, int pos) -> void {
+    if (pos >= ss.length()) {
+      res += 1;
+      return;
+    }
+    // XXX: First get all the words in dictionary matching the first
+    // char of the string ss
+    // O(k)
+    auto rr = ranges::views::filter(
+        words, [&ss, &pos](const string &c) { return c.starts_with(ss[pos]); });
+    for (const auto &r : rr) {
+      string pp = ss.substr(pos, r.length());
+      if (pp == r) {
+        // XXX: O(m)
+        self(pos + r.length());
+      }
+    }
+  };
+  rec_res(0);
+  cout << res << "\n";
+}
+
+void string_match_naive() {
+  string ss;
+  string p;
+  cin >> ss; // The string to search in
+  cin >> p;  // The patterns to search for
+  st pos = 0;
+  st res = 0;
+  st pl = p.length();
+  // O(|ss|*|p|)
+  while (pos < ss.length()) {
+    if ((pos = ss.find(p, pos)) != string::npos) {
+      pos += pl;
+      cout << "pos: " << pos << "\n";
+      res += 1;
+    } else
+      break;
+  }
+  cout << res << "\n";
+}
+
+struct node{
+  st len = 0;                   // the maximum suffix length of this node
+  unordered_map<char, st> next; // the outgoing edges from the node
+  int link;                     // the parent link
+  st num;                       // mu number in the vector of nodes
+  st mfpos;                    // the position in the string
+  node(st l, const unordered_map<char, st> &m, int li, st t, st fpos)
+      : len(l), next(m), link(li), num(t), mfpos(fpos) {}
+  node(st l, unordered_map<char, st> &&m, int li, st t, st fpos)
+      : len(l), next(std::move(m)), link(li), num(t), mfpos(fpos) {}
+  friend ostream &operator<<(ostream &os, const node &);
+};
+
+ostream &operator<<(ostream &os, const node &n) {
+  os << "{";
+  os << n.len << ", ";
+  os << "[";
+  for (auto &[k, v] : n.next) {
+    os << k << ":" << v << " ";
+  }
+  os << "], ";
+  os << "link: " << n.link << ", num:" << n.num << ", fpos:" << n.mfpos;
+  os << "}\n";
+  return os;
+}
+
+// XXX: Inputs:
+// 1. String to convert to suffix automata.
+// 2. A vector of struct node type.
+st suffix_automata(const string &s, vector<node> &v) {
+  // XXX: first make the initial node
+  st total = 0;
+  node i = {0, {}, -1, total++, 0};
+  v.push_back(std::move(i));
+  int last = 0;
+  // XXX: Now for each character of the string make the suffix automata.
+  for (const char x : s) {
+    // XXX: Make a current node
+    node c{v[last].len + 1, {}, -1, total++, v[last].len};
+    v.push_back(std::move(c));
+    st curr = c.num;
+    // XXX: Now traverse backwards and add the next to this node
+    int p = last;
+    while (p != -1) {
+      if (!v[p].next.contains(x)) {
+        // XXX: Then add an edge from last to curr
+        v[p].next[x] = curr;
+      } else
+        break;
+      // XXX: Move to the parent
+      p = v[p].link;
+    }
+    if (p == -1) {
+      // XXX: Just add a backward link from curr to 0 (initial state)
+      v[curr].link = 0;
+    } else {
+      st q = v[p].next[x];
+      if (v[q].len == v[p].len + 1) {
+        // XXX: Just add a link from curr to q
+        v[curr].link = q;
+      } else {
+        // XXX: Make a copy of q with new len and link curr to this clone
+        // cout << "cloning " << q << "for p: " << p << "\n";
+        st qqn = total++;
+        node qq{v[p].len + 1, v[q].next, v[q].link, qqn, v[q].mfpos};
+        v.push_back(std::move(qq));
+        while (p != -1 and v[p].next[x] == q) {
+          v[p].next[x] = qqn;
+          p = v[p].link;
+        }
+        // XXX: Finally add the link from curr to qq
+        v[curr].link = qqn;
+        v[q].link = qqn;
+      }
+    }
+    // XXX: Finally set last to curr.
+    last = curr;
+  }
+  return last;
+}
+
+void collect_terminal_nodes(const vector<node> &v, const string &s,
+                            vector<bool> &vis, vector<bool> &isterminal,
+                            string path, st start = 0) {
+  // XXX: print this node
+  vis[start] = true;
+  // cout << path << "\n";
+  // XXX: Check of this node is a terminal node
+  isterminal[start] =
+      path == s.substr(s.length() - path.length()) and start != 0;
+  // cout << v[start];
+  for (auto &[k, c] : v[start].next) {
+    if (!vis[c]) {
+      collect_terminal_nodes(v, s, vis, isterminal, path + k, c);
+    }
+  }
+}
+
+template <class O = plus<st>>
+void collect_paths_to_term(const vector<node> &v, vector<st> &paths,
+                           const vector<bool> &terminal, st start = 0,
+                           O op = O{}) {
+  if (terminal[start])
+    paths[start] += 1;
+  // XXX: Now go through the children and ask them for their paths!
+  for (const auto &[_, c] : v[start].next) {
+    if (!paths[c]) {
+      // XXX: Go to the child
+      collect_paths_to_term(v, paths, terminal, c, op);
+    }
+    // XXX: Now add the result of child to yourself!
+    paths[start] = op(paths[start], paths[c]);
+    // paths[start] += paths[c];
+  }
+}
+
+// XXX: This will give the number of all distinct substrings in this
+// string
+void collect_all_paths(const vector<node> &v, vector<st> &paths, st start = 0) {
+  // XXX: Now go through the children and ask them for their paths!
+  for (const auto &[_, c] : v[start].next) {
+    if (!paths[c]) {
+      // XXX: Go to the child
+      collect_all_paths(v, paths, c);
+    }
+    // XXX: Now add the result of child to yourself!
+    paths[start] += paths[c];
+  }
+  if (start != 0)
+    paths[start] += 1;
+}
+
+void string_match_suffix_automata() {
+  string s;
+  cin >> s;
+  string q;
+  cin >> q;
+  // XXX: Make the suffic automata.
+  vector<node> c;
+  suffix_automata(s, c);
+  // cout << "total added: " << total << "\n";
+  // XXX: Get all the terminal nodes in the suffix automata
+  vector<bool> vis(c.size(), false);
+  vector<bool> isterminal(c.size(), false);
+  string path = "";
+  collect_terminal_nodes(c, s, vis, isterminal, path);
+  // cout << isterminal;
+  // XXX: Get the number of paths to terminal/accepting state from any
+  // other state.
+  vector<st> paths(c.size(), 0);
+  collect_paths_to_term(c, paths, isterminal);
+  // cout << paths;
+  // XXX: Now search for the state that you end up in when traversing
+  // the query!
+  st i = 0;
+  for (const char &x : q) {
+    i = c[i].next[x];
+  }
+  cout << paths[i] << "\n";
+}
+
+void pattern_matches() {
+  string s;
+  cin >> s;
+  st N;
+  cin >> N;
+  vector<string> qs(N);
+  st counter = 0;
+  // cout << "N: " << N << "\n";
+  while (counter < N) {
+    cin >> qs[counter++];
+  }
+  // cout << s << "\n";
+  // cout << qs;
+  // XXX: Make the suffix automata
+  // XXX: Make the suffic automata.
+  vector<node> c;
+  suffix_automata(s, c);
+
+  // XXX: Now query if the pattern exists in the automata
+  for (const string &q : qs) {
+    counter = 0;
+    bool done = true;
+    // cout << q << "\n";
+    for (const char c1 : q) {
+      if (!c[counter].next.contains(c1)) {
+        cout << "NO\n";
+        done = false;
+        break;
+      }
+      counter = c[counter].next[c1];
+    }
+    if (done)
+      cout << "YES\n";
+  }
+}
+
+bool is_palindrome(string s) {
+  st counter = 0;
+  st bcounter = s.length() - 1;
+  bool toret = true;
+  while (counter < bcounter) {
+    if (s[counter] == s[bcounter]) {
+      ++counter;
+      --bcounter;
+    } else {
+      toret = false;
+      break;
+    }
+  }
+  return toret;
+}
+
+void palindrome_qs() {
+  st N, M;
+  cin >> N;
+  cin >> M;
+  string s;
+  cin >> s;
+  st counter = 0;
+  int q, f;
+  while (counter < M) {
+    cin >> q;
+    cin >> f;
+    --f;
+    if (q == 2) {
+      int e;
+      cin >> e;
+      // cout << s.substr(f, (e - f) + 1) << "\n";
+      // XXX: O((e-f)/2)
+      if (is_palindrome(s.substr(f, (e - f))))
+        cout << "YES\n";
+      else
+        cout << "NO\n";
+    } else if (q == 1) {
+      // XXX: O(1)
+      char t;
+      cin >> t;
+      s[f] = t;
+    }
+    ++counter;
+  }
+}
+
+void distinct_substrings() {
+  string s;
+  cin >> s;
+  vector<node> c;
+  suffix_automata(s, c);
+  // XXX: Now get all the number of paths in the suffix automata
+  vector<st> paths(c.size(), 0);
+  collect_all_paths(c, paths);
+  cout << paths[0] << "\n";
+}
+
+void longest_term_path(vector<node> &v, vector<st> &res, st start = 0){
+  vector<st> ls(v[start].next.size(), 0);
+  for(st i = 0; auto &[k, c]: v[start].next){
+    if(!res[c]){
+      longest_term_path(v, res, c);
+    }
+    ls[i] = res[c] + 1;
+    ++i;
+  }
+  // XXX: Should handle empty list (I think)
+  if(!ls.empty())
+    res[start] = *max_element(begin(ls), end(ls));
+}
+
+void pattern_position() {
+  string s;
+  cin >> s;
+  st k;
+  cin >> k;
+  vector<node> c;
+  suffix_automata(s, c);
+  // TODO: write the function to the get the max length path to the
+  // terminal (accepting states)
+  vector<st> longest(c.size(), 0);
+  longest_term_path(c, longest);
+  // cout << c;
+  // cout << longest;
+  st counter = 0;
+  string ss;
+  while (counter < k) {
+    cin >> ss;
+    // TODO: Check if the string exists in the suffix automata. Get the
+    // max length to the terminal state, if the string exists.
+    st i = 0;
+    bool d = true;
+    for (const char x : ss) {
+      if (c[i].next.contains(x)) {
+        i = c[i].next[x];
+      } else {
+        cout << -1 << "\n";
+        d = false;
+        break;
+      }
+    }
+    if (d) {
+      // XXX: The last +1 is because of index starting from 1 in test
+      cout << s.size() - (longest[i] + ss.size()) + 1 << "\n";
+    }
+    ++counter;
+  }
 }
 
 int main() {
@@ -2965,7 +3324,14 @@ int main() {
   // clang C++23, but does not work with g++!
 
   // XXX: String algorithms
-  word_combinations();
-
+  // word_combinations(); // recursive solution with filter view
+  // string_match_naive();
+  // https://saisumit.wordpress.com/2016/01/26/suffix-automaton/
+  // https://codeforces.com/blog/entry/20861
+  // string_match_suffix_automata(); // suffix automata
+  // pattern_matches(); //using suffix automata
+  // palindrome_qs(); // using simple lookup
+  // distinct_substrings();
+  // pattern_position(); //longest path to terminal (accepting state)
   return 0;
 }
