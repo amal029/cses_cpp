@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <functional>
 #include <iostream>
 #include <iterator>
@@ -2984,6 +2985,8 @@ ostream &operator<<(ostream &os, const node &n) {
 // XXX: Inputs:
 // 1. String to convert to suffix automata.
 // 2. A vector of struct node type.
+// XXX: See: https://saisumit.wordpress.com/2016/01/26/suffix-automaton/
+// XXX: See: https://codeforces.com/blog/entry/20861
 st suffix_automata(const string &s, vector<node> &v) {
   // XXX: first make the initial node
   st total = 0;
@@ -3262,6 +3265,162 @@ void pattern_position() {
   }
 }
 
+void substring_freq() {
+  string s;
+  cin >> s;
+  vector<node> c;
+  suffix_automata(s, c);
+  vector<st> freq(s.size() + 1, 0);
+  // XXX: Now do a DFS of the suffix automata and update the freq
+  // distribution.
+  auto dfs_freq = [&c, &freq](this auto &&self, st counter = 0,
+                              st start = 0) -> void {
+    freq[counter] += 1;
+    for (auto &[_, v] : c[start].next) {
+      self(counter + 1, v);
+    }
+  };
+  dfs_freq();
+  // XXX: This is just extra copy!
+  cout << vector<st>{freq.begin() + 1, freq.end()};
+}
+
+void weird_algo() {
+  st s;
+  cin >> s;
+  cout << s << " ";
+  while (s != 1) {
+    if (s % 2 == 0) {
+      s /= 2;
+    } else {
+      s *= 3;
+      s++;
+    }
+    cout << s << " ";
+  }
+  cout << endl;
+}
+
+void missing_number(){
+  st s;
+  cin >> s;
+  st counter = 0;
+  vector<st> vs(s + 1, 0);
+  st j;
+  while (counter < s - 1) {
+    cin >> j;
+    vs[j] = j;
+    ++counter;
+  }
+  st iit = find(vs.begin() + 1, vs.end(), 0) - vs.begin();
+  cout << iit << "\n";
+}
+
+void two_sets(){
+  int s;
+  cin >> s;
+  int orig = s;
+  int y = (s * (s + 1) / 2);
+  if (y % 2 == 0) {
+    vector<int> nums;
+    nums.push_back(s--);
+    int curr = s;
+    int rem = (y / 2) - curr;
+    // cout << rem << "\n";
+    while (rem != 0) {
+      if (rem - s >= 0) {
+        nums.push_back(s--);
+        // cout << nums;
+      } else {
+        // XXX: This should be final
+        // cout << "pushing last value: " << (rem) << "\n";
+        nums.push_back(rem);
+        // cout << nums;
+      }
+      curr = accumulate(nums.begin(), nums.end(), 0);
+      rem = (y / 2) - curr;
+      // cout << "rem: " << rem << " s: " << s << "\n";
+    }
+    cout << "YES\n";
+    cout << nums.size() << "\n";
+    cout << nums;
+    cout << orig - nums.size() << "\n";
+    for (int j = nums[nums.size() - 1] + 1; j <= s; ++j) {
+      cout << j << " ";
+    }
+    cout << "\n";
+  } else
+    cout << "NO\n";
+}
+
+void digit_qs() {
+  st qs;
+  cin >> qs;
+  st counter = 0;
+  while (counter < qs) {
+    st q;
+    cin >> q;
+    st j = 1;
+    // XXX: A very stupid way of doing things!
+    st i = 1;
+    while (j < q) {
+      j += to_string(i).size();
+      i++;
+    }
+    i = (j > q) ? (i - 1) : i;
+    string h = to_string(i);
+    cout << h[h.length() - 1] << "\n";
+    ++counter;
+  }
+}
+
+void palindrome_reorder() {
+  string s;
+  cin >> s;
+  // XXX: Partition by letter
+  vector<vector<char>> cs;
+  vector<char> ocs;
+  auto bg = begin(s);
+  auto eg = end(s);
+  st odds = 0;
+  // XXX: I can make this a lot simpler using just a hashtable
+  for (const char x : ranges::views::iota('a', '{')) {
+    auto it = partition(bg, eg, [&x](char y) { return x == y; });
+    vector<char> b = vector<char>(bg, it);
+    if (b.size() != 0 and b.size() % 2 == 0)
+      // XXX: Why does this give an error when using move in g++?
+      cs.push_back(b);
+    if (b.size() % 2 != 0) {
+      ocs = std::move(b);
+      odds += 1;
+    }
+    if (odds > 1)
+      break;
+    bg = it;
+  }
+  if (odds != 1)
+    cout << "NO SOLUTION\n";
+  else {
+    // XXX: Just put the evens on each side of the string and the odd
+    // one in the middle!
+    string res(s.size(), '\0');
+    st f = 0;
+    st e = s.size() - 1;
+    for (vector<char> &x : cs) {
+      // XXX: First add the even characters on both sides.
+      for (st j = 0; j < x.size(); j += 2) {
+        res[f++] = x[j];
+        res[e--] = x[j];
+      }
+    }
+    for (st j = 0; j < ocs.size(); j += 2) {
+      res[f++] = ocs[j];
+      res[e--] = ocs[j];
+    }
+    cout << res << "\n";
+  }
+}
+
 int main() {
   // XXX: Sorting and searching algo
   // list_to_set();
@@ -3333,5 +3492,14 @@ int main() {
   // palindrome_qs(); // using simple lookup
   // distinct_substrings();
   // pattern_position(); //longest path to terminal (accepting state)
+  // substring_freq();
+
+  // XXX: Beginner problems
+  // weird_algo();
+  // missing_number();
+  // two_sets();
+  // digit_qs();
+  // palindrome_reorder();
+
   return 0;
 }
