@@ -2,5 +2,9 @@
     { "directory": "/Users/amal029/Documents/cpp",
       "command": "/opt/llvm/bin/clang++ -Wno-vla -O3 -march=native -std=c++23 -o sticks",
       "file": "sticks.cpp"
+    },
+    { "directory": "/Users/amal029/Documents/cpp",
+      "command": "/opt/llvm/bin/clang++ -Wno-vla -O3 -march=native -std=c++23 -o sticks",
+      "file": "type_state.cpp"
     }
 ]

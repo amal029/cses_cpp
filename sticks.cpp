@@ -3421,6 +3421,25 @@ void palindrome_reorder() {
   }
 }
 
+void fib() {
+  st n;
+  cin >> n;
+  if (n <= 3) {
+    cout << "2\n";
+  } else {
+    double o = 2;
+    double oo = 1;
+    double u = 0;
+    for (st i = 3; i < n; ++i) {
+      u = oo + o;
+      oo = o;
+      o = u;
+    }
+    double y = pow(10, 9) + 7;
+    cout << (st)o % (st)y << "\n";
+  }
+}
+
 int main() {
   // XXX: Sorting and searching algo
   // list_to_set();
@@ -3501,6 +3520,9 @@ int main() {
   // two_sets();
   // digit_qs();
   // palindrome_reorder();
+
+  // XXX: Mathematics
+  fib();
 
   return 0;
 }
